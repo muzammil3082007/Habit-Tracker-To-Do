@@ -1,0 +1,2235 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PeakFlow Planner • Daily Habits & Tasks</title>
+    <!-- Google Fonts for Amiri and Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400;1,700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Firebase App and Services (Compat v8) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <!-- Tailwind Config for PeakFlow Dark Theme -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              cream: '#090e18',          /* Deep space navy body */
+              cardBg: '#0f172a',         /* Dark slate panel */
+              gold: '#5f5af6',           /* Vibrant cosmic indigo */
+              goldHover: '#4f46e5',
+              greenAccent: '#10b981',    /* Rich emerald teal */
+              greenAccentHover: '#059669',
+              redAccent: '#f43f5e',      /* Vivid crimson rose */
+              redAccentHover: '#e11d48',
+              orangeAccent: '#f59e0b',   /* Bright amber */
+              charcoal: '#f8fafc',       /* Cool clean silver white text */
+            },
+            fontFamily: {
+              amiri: ['Amiri', 'serif'],
+              outfit: ['Outfit', 'sans-serif'],
+              serif: ['Amiri', 'Georgia', 'serif'],
+              sans: ['Outfit', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    
+    <style>
+      /* Physical paper background overlay using high-fidelity dark micro noise */
+      .paper-texture {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9999;
+        opacity: 0.15;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      }
+
+      body {
+        background-color: #090e18;
+        color: #f1f5f9;
+        font-family: 'Outfit', sans-serif;
+        background-image: 
+          radial-gradient(rgba(95, 90, 246, 0.08) 1px, transparent 1px),
+          linear-gradient(rgba(95, 90, 246, 0.02) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(95, 90, 246, 0.02) 1px, transparent 1px);
+        background-size: 14px 14px, 28px 28px, 28px 28px;
+        overflow-x: hidden;
+      }
+
+      /* Custom animated progress bar gradients and ease transition */
+      .progress-transition {
+        transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1), width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* Thin scrollbar style for list containers */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(95, 90, 246, 0.2);
+        border-radius: 99px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background-color: rgba(95, 90, 246, 0.4);
+      }
+
+      /* Bounce scale-up effect */
+      @keyframes popIn {
+        0% { transform: scale(0.9); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .animate-pop-in {
+        animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
+
+      /* Navigation bottom line bar */
+      .active-nav-indicator {
+        position: relative;
+      }
+      .active-nav-indicator::after {
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 25%;
+        width: 50%;
+        height: 3px;
+        background: #5f5af6;
+        border-radius: 99px;
+        box-shadow: 0 2px 8px rgba(95, 90, 246, 0.5);
+      }
+    </style>
+  </head>
+  <body class="min-h-screen py-6 px-4 flex flex-col justify-between items-center relative select-none">
+    
+    <!-- Premium background overlay -->
+    <div class="paper-texture"></div>
+
+    <!-- INITIAL INITIALIZATION LOADER -->
+    <div id="init-loader" class="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#090e18] space-y-4">
+      <div class="w-12 h-12 rounded-full border-4 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+      <p class="font-outfit text-sm text-slate-400 font-medium tracking-wide">Syncing PeakFlow Account...</p>
+    </div>
+
+    <!-- AUTH CARD -->
+    <main id="auth-card" class="w-full max-w-[440px] bg-[#0f172a] rounded-[28px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] overflow-hidden border border-slate-800/80 flex flex-col relative z-20 min-h-[580px] justify-between mb-6 hidden">
+      <!-- Top aesthetic premium indicator bar -->
+      <div class="h-[4px] w-full bg-gradient-to-r from-gold via-[#bf5af2] to-greenAccent"></div>
+      
+      <div class="p-6 flex-1 flex flex-col justify-between">
+        <!-- Logo and Header -->
+        <div class="text-center mt-4">
+          <div class="font-amiri text-lg text-[#f59e0b] text-center mb-1 tracking-wide font-medium select-none opacity-80">﷽</div>
+          <div class="flex items-center justify-center gap-2.5 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-[#5f5af6] flex items-center justify-center shadow-[0_4px_12px_rgba(95,90,246,0.25)]">
+              <i class="w-6 h-6 text-white" data-lucide="clipboard-check"></i>
+            </div>
+            <div class="text-left">
+              <h1 class="font-outfit text-xl font-bold text-white tracking-wide leading-tight">PeakFlow</h1>
+              <p class="font-outfit text-[10px] text-[#818cf8] tracking-widest uppercase font-extrabold">Planner</p>
+            </div>
+          </div>
+          <p class="text-slate-400 text-xs font-medium mt-3">Connect your secure private cloud account to synchronize your habits, checklists, and daily statistics.</p>
+        </div>
+
+        <!-- Auth Form Inputs -->
+        <div class="my-6 space-y-4">
+          <!-- Switch tab (Login vs SignUp) -->
+          <div class="flex bg-[#131b2e] p-1 rounded-xl border border-slate-800/80">
+            <button id="auth-tab-login" onclick="switchAuthTab('login')" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all text-white bg-[#5f5af6] shadow-md">
+              Sign In
+            </button>
+            <button id="auth-tab-register" onclick="switchAuthTab('register')" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all text-slate-400 hover:text-white">
+              Create Account
+            </button>
+          </div>
+
+          <!-- Email Input -->
+          <div class="space-y-1.5">
+            <label class="font-outfit text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Email Address</label>
+            <div class="relative flex items-center">
+              <input type="email" id="auth-email" placeholder="name@example.com" class="w-full bg-[#0a0e1a] p-3 pl-10 rounded-xl border border-slate-800 text-sm outline-none text-white focus:border-[#5f5af6] placeholder-slate-600 font-medium transition-all">
+              <i class="w-4 h-4 text-slate-500 absolute left-3.5" data-lucide="mail"></i>
+            </div>
+          </div>
+
+          <!-- Password Input -->
+          <div class="space-y-1.5">
+            <label class="font-outfit text-[10px] font-bold text-slate-400 tracking-wider uppercase block">Password</label>
+            <div class="relative flex items-center">
+              <input type="password" id="auth-password" placeholder="••••••••" class="w-full bg-[#0a0e1a] p-3 pl-10 rounded-xl border border-slate-800 text-sm outline-none text-white focus:border-[#5f5af6] placeholder-slate-600 font-medium transition-all">
+              <i class="w-4 h-4 text-slate-500 absolute left-3.5" data-lucide="lock"></i>
+            </div>
+          </div>
+
+          <!-- Status Message Display -->
+          <div id="auth-error-container" class="hidden bg-rose-500/10 border border-rose-500/30 p-3 rounded-xl flex items-start gap-2.5 text-left animate-pop-in">
+            <i class="w-4 h-4 text-rose-500 shrink-0 mt-0.5" data-lucide="alert-circle"></i>
+            <span id="auth-error-text" class="text-[11px] font-medium text-rose-300 leading-normal">Incorrect password. Please try again.</span>
+          </div>
+
+          <!-- Action Button -->
+          <button id="auth-submit-btn" onclick="handleAuthSubmit()" class="w-full py-3.5 mt-2 bg-gradient-to-r from-gold to-[#7b75ff] hover:brightness-110 active:scale-[0.98] text-white rounded-xl font-outfit text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all cursor-pointer flex items-center justify-center gap-2">
+            <span id="auth-submit-text">Sign In</span>
+            <div id="auth-submit-spinner" class="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin hidden"></div>
+          </button>
+        </div>
+
+        <!-- Footer terms -->
+        <div class="text-center text-[10px] text-slate-500 pb-2 select-none">
+          🔒 Secured by Firebase Authentication &amp; Firestore
+        </div>
+      </div>
+    </main>
+
+    <!-- Main Application Wrapper Card (Sized precisely to 440px max-width, matching premium mobile viewport) -->
+    <main id="main-card" class="w-full max-w-[440px] bg-[#0f172a] rounded-[28px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] overflow-hidden border border-slate-800/80 flex flex-col relative z-20 min-h-[680px] justify-between mb-6 hidden">
+      
+      <!-- Top aesthetic premium indicator bar -->
+      <div class="h-[4px] w-full bg-gradient-to-r from-gold via-[#bf5af2] to-greenAccent"></div>
+      
+      <!-- Inner card container -->
+      <div class="p-5 flex-1 flex flex-col justify-between">
+        
+        <!-- HEADER BLOCK -->
+        <header class="mb-4">
+          <!-- Center Bismillah calligraphy -->
+          <div class="font-amiri text-lg text-[#f59e0b] text-center mb-0.5 tracking-wide font-medium select-none opacity-80" id="bismillah">﷽</div>
+          
+          <!-- PeakFlow Header panel -->
+          <div class="flex items-center justify-between mt-1 px-1">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-[#5f5af6] flex items-center justify-center shadow-[0_4px_12px_rgba(95,90,246,0.25)]">
+                <i class="w-5 h-5 text-white" data-lucide="clipboard-check"></i>
+              </div>
+              <div>
+                <h1 class="font-outfit text-lg font-bold text-white tracking-wide leading-tight">PeakFlow</h1>
+                <p class="font-outfit text-[9px] text-[#818cf8] tracking-widest uppercase font-extrabold">Planner</p>
+              </div>
+            </div>
+            
+            <!-- Streak Indicator -->
+            <div class="text-right">
+              <span class="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">Active Streak</span>
+              <span class="font-outfit text-xs font-bold text-white flex items-center justify-end gap-1 mt-0.5">
+                🔥 <span id="streak-days" class="text-orangeAccent">0</span> Days
+              </span>
+            </div>
+
+            <!-- Initials & Logout label -->
+            <div class="flex items-center gap-2">
+              <div id="user-initials" class="w-8 h-8 rounded-full bg-slate-800 text-[#818cf8] border border-slate-700/80 flex items-center justify-center font-bold text-xs shadow-inner select-none" title="No User">
+                ??
+              </div>
+              <button onclick="handleLogout()" class="w-8 h-8 rounded-full bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 flex items-center justify-center cursor-pointer transition-all active:scale-95" title="Log Out">
+                <i class="w-4 h-4" data-lucide="log-out"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Date Banner -->
+          <div class="w-full mt-3 bg-[#131b2e] py-2 px-3.5 rounded-xl border border-slate-800/80 flex items-center justify-center text-slate-300 shadow-inner">
+            <div class="font-outfit text-[10px] font-bold tracking-wider text-indigo-400 uppercase flex items-center gap-1.5" id="header-date">
+              Loading combined spiritual calendar...
+            </div>
+          </div>
+
+        </header>
+
+        <!-- PORT VIEWPORT (SCROLLABLE AREA) -->
+        <div class="flex-1 overflow-y-auto max-h-[460px] custom-scrollbar pr-0.5 space-y-4" id="tab-viewport">
+          
+          <!-- VIEW 1: TASKS & TODAY'S SCHEDULE -->
+          <section id="view-today" class="space-y-4">
+            
+            <!-- Dynamic Momentum Widget -->
+            <div class="bg-gradient-to-br from-[#161f33] to-[#11192b] p-4 rounded-2xl border border-slate-850 border-slate-800/60 shadow-md flex items-center justify-between gap-4">
+              <div class="space-y-1">
+                <h3 class="font-outfit text-sm font-bold text-slate-200">Daily Momentum</h3>
+                <p id="today-progress-stats" class="font-outfit text-xs text-slate-400">Loading progress...</p>
+                <!-- Interactive Focus Badge -->
+                <div class="mt-2.5">
+                  <span class="text-[9px] uppercase tracking-wider font-extrabold text-[#9491ff] bg-[#5f5af6]/15 border border-[#5f5af6]/30 px-2.5 py-1 rounded-full flex items-center gap-1.5 w-max">
+                    <span class="w-1.5 h-1.5 rounded-full bg-[#5f5af6] animate-ping"></span> Focus Active
+                  </span>
+                </div>
+              </div>
+              
+              <!-- SVG Circular Ring Gauge -->
+              <div class="relative w-16 h-16 flex items-center justify-center shrink-0 select-none">
+                <svg class="w-16 h-16 transform -rotate-90">
+                  <circle cx="32" cy="32" r="26" stroke="rgba(255,255,255,0.05)" stroke-width="4.5" fill="transparent" />
+                  <circle id="gauge-circle" cx="32" cy="32" r="26" stroke="#5f5af6" stroke-width="4.5" fill="transparent" 
+                          stroke-dasharray="163.3" stroke-dashoffset="163.3" 
+                          class="progress-transition" stroke-linecap="round" />
+                </svg>
+                <span id="gauge-text" class="absolute text-[11px] font-extrabold text-white">0%</span>
+              </div>
+            </div>
+
+            <!-- Daily Habits Section -->
+            <div class="space-y-2.5">
+              <h3 class="font-outfit text-[10px] font-bold text-slate-400 tracking-widest uppercase pl-1 flex items-center gap-1.5">
+                <i class="w-3.5 h-3.5 text-[#5f5af6]" data-lucide="bookmark"></i> Daily Habits
+              </h3>
+              <div id="today-habits-list" class="space-y-2">
+                <!-- Dynamically populated habits list -->
+              </div>
+            </div>
+
+            <!-- Just Once Tasks Section -->
+            <div class="space-y-2.5 pt-1">
+              <h3 class="font-outfit text-[10px] font-bold text-slate-400 tracking-widest uppercase pl-1 flex items-center gap-1.5">
+                <i class="w-3.5 h-3.5 text-[#f59e0b]" data-lucide="check-square"></i> Just Once Tasks
+              </h3>
+              <div id="today-tasks-list" class="space-y-2">
+                <!-- Dynamically populated tasks list -->
+              </div>
+            </div>
+            
+            <!-- Quick Surah Quote Decoration -->
+            <div class="bg-[#131b2e]/60 p-3.5 rounded-xl border border-slate-900 shadow-inner text-center space-y-1.5 mt-2">
+              <div class="font-amiri text-xs italic text-[#f59e0b] font-semibold" id="verse-arabic">
+                "إنَّ اللَّهَ لَا يُغَيِّرُ مَا بِقَوْمٍ حَتَّىٰ يُغَيِّرُوا مَا بِأَنفُسِهِمْ"
+              </div>
+              <div class="font-outfit text-[8px] text-slate-400 uppercase tracking-widest font-extrabold" id="verse-trans">
+                "Indeed, Allah will not change their condition... Surah Ar-Ra'd"
+              </div>
+            </div>
+            
+          </section>
+
+          <!-- VIEW 2: HABITS CREATION & MANAGEMENT -->
+          <section id="view-habits" class="hidden space-y-3.5">
+            <div class="flex items-center gap-2 pl-0.5">
+              <span class="w-1.5 h-4 bg-[#5f5af6] rounded-full"></span>
+              <h2 class="font-outfit text-sm font-bold text-slate-200 uppercase tracking-wider">Active Schedules</h2>
+            </div>
+            <div id="habits-list-all" class="space-y-2.5">
+              <!-- Dynamically populated active list of all habits -->
+            </div>
+          </section>
+
+          <!-- VIEW 3: ANALYTICS & STATS -->
+          <section id="view-monthly" class="hidden space-y-4">
+            <div class="flex items-center gap-2 pl-0.5">
+              <span class="w-1.5 h-4 bg-[#10b981] rounded-full"></span>
+              <h2 class="font-outfit text-sm font-bold text-slate-200 uppercase tracking-wider">Monthly Intelligence</h2>
+            </div>
+            
+            <!-- Calendar Navigation Header -->
+            <div class="flex items-center justify-between bg-[#131b2e] p-2 rounded-xl border border-slate-800 shadow-inner">
+              <button onclick="navigateMonth(-1)" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-800 text-[#818cf8] transition-colors">
+                <i class="w-4 h-4" data-lucide="chevron-left"></i>
+              </button>
+              <span id="monthly-navigation-header" class="font-outfit text-[10px] font-bold text-slate-200 tracking-wider uppercase">
+                June • 2026
+              </span>
+              <button onclick="navigateMonth(1)" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-800 text-[#818cf8] transition-colors">
+                <i class="w-4 h-4" data-lucide="chevron-right"></i>
+              </button>
+            </div>
+
+            <!-- Premium Stats Metrics Cards (as in the screenshot!) -->
+            <div class="grid grid-cols-2 gap-2.5">
+              <div class="bg-[#131b2e] border border-slate-800 p-3 rounded-2xl flex items-center gap-3 shadow-inner">
+                <span class="text-xl">🔥</span>
+                <div>
+                  <span class="text-[9px] text-slate-400 uppercase tracking-wider block font-bold">Active Streak</span>
+                  <span class="text-sm font-extrabold text-white"><span id="streak-days-stat">0</span> days</span>
+                </div>
+              </div>
+              <div class="bg-[#131b2e] border border-slate-800 p-3 rounded-2xl flex items-center gap-3 shadow-inner">
+                <span class="text-xl">✨</span>
+                <div>
+                  <span class="text-[9px] text-slate-400 uppercase tracking-wider block font-bold">Success Index</span>
+                  <span class="text-sm font-extrabold text-[#818cf8]"><span id="productive-days-stat">1</span> days</span>
+                </div>
+              </div>
+              <div class="bg-[#131b2e] border border-slate-800 p-3 rounded-2xl flex items-center gap-3 shadow-inner">
+                <span class="text-lg text-greenAccent font-bold">✓</span>
+                <div>
+                  <span class="text-[9px] text-slate-400 uppercase tracking-wider block font-bold">Total Done</span>
+                  <span class="text-sm font-extrabold text-greenAccent" id="stat-total-done">0</span>
+                </div>
+              </div>
+              <div class="bg-[#131b2e] border border-slate-800 p-3 rounded-2xl flex items-center gap-3 shadow-inner">
+                <span class="text-lg text-redAccent font-bold">⏰</span>
+                <div>
+                  <span class="text-[9px] text-slate-400 uppercase tracking-wider block font-bold">Total Missed</span>
+                  <span class="text-sm font-extrabold text-redAccent" id="stat-total-missed">0</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- FOLDER LOCATION DISTRIBUTION DONUT CHART -->
+            <div class="bg-[#131b2e] p-4 rounded-2xl border border-slate-800 shadow-sm space-y-3 flex flex-col items-center">
+              <span class="font-outfit text-[10px] font-bold text-slate-300 tracking-wider uppercase block text-center w-full">
+                🗺️ Location Hub Distribution
+              </span>
+              <div id="folder-distribution-chart-wrapper" class="flex items-center justify-center gap-6 py-2.5 w-full">
+                <!-- Inline SVG donut charts dynamically generated -->
+              </div>
+            </div>
+
+            <!-- Attendance Grid Wrapper -->
+            <div id="monthly-habits-container" class="space-y-3.5">
+              <!-- Grid trackers populated dynamically -->
+            </div>
+
+            <!-- Overall Daily Completion Bar Chart -->
+            <div class="bg-[#131b2e] p-4 rounded-2xl border border-slate-800 text-center space-y-3">
+              <span class="font-outfit text-[10px] font-bold text-[#818cf8] tracking-widest uppercase block">
+                📊 Daily Activity Density
+              </span>
+              
+              <!-- Visual Chart scrollable grid -->
+              <div class="w-full overflow-x-auto custom-scrollbar pt-2 pb-1">
+                <div class="flex items-end justify-between gap-1.5 min-w-[340px] h-28 px-1" id="monthly-bar-chart">
+                  <!-- Dynamic vertical visual chart bars -->
+                </div>
+              </div>
+
+              <!-- Compact Chart Legends -->
+              <div class="flex justify-center items-center gap-4 text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                <span class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 bg-greenAccent rounded-sm"></span> Done
+                </span>
+                <span class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 bg-[#5f5af6] rounded-sm"></span> Today
+                </span>
+                <span class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 bg-transparent border border-dashed border-slate-700 rounded-sm"></span> Future
+                </span>
+              </div>
+            </div>
+
+          </section>
+
+        </div>
+
+      </div>
+
+      <!-- FLOATING ACTION BUTTON FOR ADDITION -->
+      <button onclick="openModal()" id="btn-add-floating" class="absolute bottom-16 right-5 w-12 h-12 bg-gradient-to-r from-gold to-[#7b75ff] text-white rounded-full shadow-[0_6px_18px_rgba(95,90,246,0.4)] hover:shadow-[0_10px_24px_rgba(95,90,246,0.6)] hover:scale-105 active:scale-95 transition-all text-xl flex items-center justify-center z-40 hover:cursor-pointer" title="Add Habit or Task">
+        <i class="w-5 h-5 text-white" data-lucide="plus"></i>
+      </button>
+
+      <!-- BOTTOM NAVIGATION TABS (Perfectly Matches Screenshot!) -->
+      <nav class="flex items-center justify-around bg-[#0a0e1a] border-t border-slate-800/80 py-3.5 px-4 z-30 shadow-2xl relative select-none">
+        
+        <button onclick="switchTab('today')" id="tab-btn-today" class="flex flex-col items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-white transition-all focus:outline-none relative py-1 flex-1">
+          <i class="w-5 h-5 transition-colors" id="tab-icon-today" data-lucide="clipboard-check"></i>
+          <span>Tasks</span>
+        </button>
+        
+        <button onclick="switchTab('habits')" id="tab-btn-habits" class="flex flex-col items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-white transition-all focus:outline-none relative py-1 flex-1">
+          <i class="w-5 h-5 transition-colors" id="tab-icon-habits" data-lucide="bookmark"></i>
+          <span>Habits</span>
+        </button>
+        
+        <button onclick="switchTab('monthly')" id="tab-btn-monthly" class="flex flex-col items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-white transition-all focus:outline-none relative py-1 flex-1">
+          <i class="w-5 h-5 transition-colors" id="tab-icon-monthly" data-lucide="trending-up"></i>
+          <span>Analytics</span>
+        </button>
+
+      </nav>
+
+      <!-- Bottom OS simulated home swipe bar -->
+      <div class="h-5 w-full bg-[#0a0e1a] flex items-center justify-center pb-2 select-none pointer-events-none">
+        <div class="w-28 h-1 bg-slate-700 rounded-full opacity-60"></div>
+      </div>
+      
+    </main>
+
+    <!-- STEP-BY-STEP ADD HABIT POPUP DIALOG (Styled perfectly for space-navy brand theme) -->
+    <dialog id="modal-add-step" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 w-full h-full border-none outline-none hidden">
+      <div id="modal-container" class="bg-[#0f172a] rounded-3xl w-full max-w-[380px] shadow-2xl border border-slate-800 overflow-hidden relative p-6 flex flex-col justify-between min-h-[400px]">
+        
+        <!-- Step Header -->
+        <header id="modal-step-header" class="flex justify-between items-center pb-3 border-b border-slate-800 mb-4">
+          <span class="font-outfit text-xs font-bold text-[#818cf8] tracking-widest uppercase" id="modal-step-title">
+            Step 1 of 5
+          </span>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-[#f43f5e] transition-colors p-1">
+            <i class="w-5 h-5" data-lucide="x"></i>
+          </button>
+        </header>
+
+        <!-- Dynamic Modal Steps Body -->
+        <div class="flex-1 flex flex-col justify-center py-2">
+
+          <!-- STEP 1: Name Input -->
+          <div id="step-pane-1" class="step-pane space-y-3.5">
+            <label class="font-outfit text-xs font-bold text-slate-300 tracking-wider uppercase block">
+              💡 Name your habit or task:
+            </label>
+            <input type="text" id="habit-name-input" onkeyup="validateStep()" class="w-full bg-[#131b2e] p-3 px-4 rounded-xl border border-slate-850 border-slate-705 outline-none font-outfit text-sm text-white focus:border-[#5f5af6] focus:ring-1 focus:ring-[#5f5af6] shadow-inner transition-all placeholder-slate-500" placeholder="e.g., Read Surah Al-Mulk">
+            <p class="text-[10px] text-slate-400 font-medium italic">Make it extremely simple, achievable, and clear.</p>
+          </div>
+
+          <!-- STEP 2: Priority Selection -->
+          <div id="step-pane-2" class="step-pane hidden space-y-3">
+            <label class="font-outfit text-xs font-bold text-slate-300 tracking-wider uppercase block">
+              ⚡ Select Priority Level:
+            </label>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="setPriority('High')" id="prio-High-btn" class="py-2.5 rounded-xl border border-rose-900/40 text-xs font-bold bg-[#f43f5e]/10 text-rose-400 hover:bg-[#f43f5e]/20 transition-all text-center">
+                High
+              </button>
+              <button onclick="setPriority('Medium')" id="prio-Medium-btn" class="py-2.5 rounded-xl border border-amber-900/40 text-xs font-bold bg-[#f59e0b]/10 text-amber-400 hover:bg-[#f59e0b]/20 transition-all text-center">
+                Medium
+              </button>
+              <button onclick="setPriority('Low')" id="prio-Low-btn" class="py-2.5 rounded-xl border border-emerald-900/40 text-xs font-bold bg-[#10b981]/10 text-emerald-400 hover:bg-[#10b981]/20 transition-all text-center">
+                Low
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-400 font-medium italic">High elements highlight in crimson rose for prompt alert focuses.</p>
+          </div>
+
+          <!-- STEP 3: Frequency Selection -->
+          <div id="step-pane-3" class="step-pane hidden space-y-3">
+            <label class="font-outfit text-xs font-bold text-slate-300 tracking-wider uppercase block">
+              🗓️ Frequency Routine:
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <button onclick="setFrequency('Daily')" id="freq-Daily-btn" class="py-2 rounded-xl border border-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-all">
+                Daily
+              </button>
+              <button onclick="setFrequency('Weekly')" id="freq-Weekly-btn" class="py-2 rounded-xl border border-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-all">
+                Weekly
+              </button>
+              <button onclick="setFrequency('Monthly')" id="freq-Monthly-btn" class="py-2 rounded-xl border border-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-all">
+                Monthly
+              </button>
+              <button onclick="setFrequency('Just Once')" id="freq-Just Once-btn" class="py-2 rounded-xl border border-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-all">
+                Just Once
+              </button>
+              <button onclick="setFrequency('Custom')" id="freq-Custom-btn" class="col-span-2 py-2.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-all flex items-center justify-center gap-1.5">
+                <i class="w-3.5 h-3.5 text-indigo-400" data-lucide="sliders"></i> Customize Routine...
+              </button>
+            </div>
+            
+            <!-- Custom Collapsible Panel -->
+            <div id="custom-freq-subpanel" class="hidden bg-[#131b2e] border border-slate-800/80 p-3 rounded-xl space-y-3">
+              <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <span class="text-[9px] font-bold text-indigo-400 uppercase tracking-wider">Custom Setup</span>
+                <div class="flex bg-slate-800 p-0.5 rounded-lg border border-slate-700">
+                  <button type="button" onclick="setCustomType('weekdays')" id="custom-type-weekdays-btn" class="px-2 py-1 text-[8.5px] font-bold rounded transition-all bg-[#5f5af6] text-white shadow">
+                    Specific Days
+                  </button>
+                  <button type="button" onclick="setCustomType('count')" id="custom-type-count-btn" class="px-2 py-1 text-[8.5px] font-bold rounded transition-all text-slate-400 hover:text-white">
+                    Days / Week
+                  </button>
+                </div>
+              </div>
+
+              <!-- Option 1: Weekdays selection -->
+              <div id="custom-weekdays-view" class="space-y-1.5">
+                <p class="text-[8.5px] text-slate-400 font-semibold italic">Choose checkin days for this routine:</p>
+                <div class="flex justify-between items-center gap-1 pt-0.5">
+                  <button type="button" onclick="toggleCustomWeekday(1)" id="wd-1" class="w-7 h-7 rounded-full border border-slate-800 text-[10px] font-bold text-slate-300 flex items-center justify-center transition-all hover:bg-slate-800 hover:text-white">M</button>
+                  <button type="button" onclick="toggleCustomWeekday(2)" id="wd-2" class="w-7 h-7 rounded-full border border-slate-800 text-[10px] font-bold text-slate-300 flex items-center justify-center transition-all hover:bg-slate-800 hover:text-white">T</button>
+                  <button type="button" onclick="toggleCustomWeekday(3)" id="wd-3" class="w-7 h-7 rounded-full border border-slate-800 text-[10px] font-bold text-slate-300 flex items-center justify-center transition-all hover:bg-slate-800 hover:text-white">W</button>
+                  <button type="button" onclick="toggleCustomWeekday(4)" id="wd-4" class="w-7 h-7 rounded-full border border-slate-800 text-[10px] font-bold text-slate-300 flex items-center justify-center transition-all hover:bg-slate-800 hover:text-white">T</button>
+                  <button type="button" onclick="toggleCustomWeekday(5)" id="wd-5" class="w-7 h-7 rounded-full border border-slate-800 text-[10px] font-bold text-slate-300 flex items-center justify-center transition-all hover:bg-slate-800 hover:text-white">F</button>
+                  <button type="button" onclick="toggleCustomWeekday(6)" id="wd-6" class="w-7 h-7 rounded-full border border-slate-800 text-[10px] font-bold text-slate-300 flex items-center justify-center transition-all hover:bg-slate-800 hover:text-white">S</button>
+                  <button type="button" onclick="toggleCustomWeekday(0)" id="wd-0" class="w-7 h-7 rounded-full border border-slate-800 text-[10px] font-bold text-slate-300 flex items-center justify-center transition-all hover:bg-slate-800 hover:text-white">S</button>
+                </div>
+              </div>
+
+              <!-- Option 2: Days per week count selection -->
+              <div id="custom-count-view" class="hidden space-y-1.5">
+                <p class="text-[8.5px] text-slate-400 font-semibold italic">Choose target count of days per week:</p>
+                <div class="flex justify-between items-center gap-1 pt-0.5 bg-slate-900/60 p-1.5 rounded-lg border border-slate-800/80">
+                  <button type="button" onclick="setCustomCount(1)" id="cc-1" class="flex-1 py-1 px-1.5 rounded-md border border-slate-800 text-[9px] font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-all">1</button>
+                  <button type="button" onclick="setCustomCount(2)" id="cc-2" class="flex-1 py-1 px-1.5 rounded-md border border-slate-800 text-[9px] font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-all">2</button>
+                  <button type="button" onclick="setCustomCount(3)" id="cc-3" class="flex-1 py-1 px-1.5 rounded-md border border-slate-800 text-[9px] font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-all">3</button>
+                  <button type="button" onclick="setCustomCount(4)" id="cc-4" class="flex-1 py-1 px-1.5 rounded-md border border-slate-800 text-[9px] font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-all">4</button>
+                  <button type="button" onclick="setCustomCount(5)" id="cc-5" class="flex-1 py-1 px-1.5 rounded-md border border-slate-800 text-[9px] font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-all">5</button>
+                  <button type="button" onclick="setCustomCount(6)" id="cc-6" class="flex-1 py-1 px-1.5 rounded-md border border-slate-800 text-[9px] font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-all">6</button>
+                  <button type="button" onclick="setCustomCount(7)" id="cc-7" class="flex-1 py-1 px-1.5 rounded-md border border-slate-800 text-[9px] font-bold text-slate-400 hover:bg-slate-800 hover:text-white transition-all">7</button>
+                </div>
+                <div class="text-center font-outfit text-[9px] text-[#818cf8] font-bold pt-0.5" id="custom-count-summary">
+                  Goal: 3 days per week
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 4: Location Settings -->
+          <div id="step-pane-4" class="step-pane hidden space-y-3">
+            <label class="font-outfit text-xs font-bold text-slate-300 tracking-wider uppercase block">
+              📍 Optimal Location Hub:
+            </label>
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="setLocation('Home')" id="loc-Home-btn" class="py-2.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-all">
+                Home
+              </button>
+              <button onclick="setLocation('Anywhere')" id="loc-Anywhere-btn" class="py-2.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-all">
+                Anywhere
+              </button>
+              <button onclick="setLocation('Office')" id="loc-Office-btn" class="py-2.5 rounded-xl border border-slate-800 text-xs font-bold text-slate-300 hover:bg-slate-800 hover:text-white transition-all">
+                Office
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-400 font-medium italic">Organizes items into the visual distribution tracker widgets.</p>
+          </div>
+
+          <!-- STEP 5: Time Selection -->
+          <div id="step-pane-5" class="step-pane hidden space-y-3.5">
+            <label class="font-outfit text-xs font-bold text-slate-300 tracking-wider uppercase block">
+              🔔 Set Reminder Clock:
+            </label>
+            <input type="time" id="reminder-time-input" value="08:00" class="w-full bg-[#131b2e] p-3 px-4 rounded-xl border border-slate-800 outline-none font-outfit text-sm text-white focus:border-[#5f5af6] cursor-pointer transition-all">
+            <p class="text-[10px] text-slate-400 font-medium italic">An automatic web alert system fires at this exact selected minute.</p>
+          </div>
+
+          <!-- STEP 6: Confirmation Screen -->
+          <div id="step-pane-6" class="step-pane hidden flex flex-col items-center justify-center space-y-4 text-center py-6 animate-pop-in">
+            <div class="w-14 h-14 rounded-full bg-greenAccent/15 flex items-center justify-center text-greenAccent">
+              <i class="w-8 h-8" data-lucide="check"></i>
+            </div>
+            <div>
+              <h4 class="font-outfit text-base font-bold text-white mb-1">Item Saved Successfully!</h4>
+              <p class="font-outfit text-xs text-slate-400 max-w-[280px]">Keep doing good habits consistently to grow beautifully.</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Navigation Footers -->
+        <footer id="modal-step-nav" class="flex justify-between items-center pt-4 border-t border-slate-800 mt-4">
+          <button id="modal-btn-back" onclick="navigateStep(-1)" class="px-4 py-2 border border-slate-800 rounded-xl font-outfit text-xs font-bold text-indigo-400 hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition-all">
+            Back
+          </button>
+          
+          <div class="flex items-center gap-1.5" id="step-dots-container">
+            <!-- Dynamic dots indicators -->
+          </div>
+          
+          <button id="modal-btn-next" onclick="navigateStep(1)" class="px-5 py-2 bg-[#5f5af6] hover:bg-indigo-600 text-white rounded-xl font-outfit text-xs font-bold shadow-md hover:shadow-lg disabled:opacity-45 disabled:pointer-events-none transition-all">
+            Next
+          </button>
+        </footer>
+
+      </div>
+    </dialog>
+
+    <!-- CUSTOM CONFIRMATION DIALOG -->
+    <div id="custom-confirm-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 w-full h-full hidden">
+      <div class="bg-[#0f172a] rounded-[24px] w-full max-w-[340px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] border border-slate-800 p-6 flex flex-col items-center text-center space-y-4 animate-pop-in">
+        <div class="w-12 h-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center">
+          <i class="w-6 h-6 text-rose-500" data-lucide="alert-triangle"></i>
+        </div>
+        <div>
+          <h4 class="font-outfit text-sm font-bold text-white mb-1" id="confirm-modal-title">Delete Item?</h4>
+          <p class="font-outfit text-xs text-slate-400 leading-relaxed" id="confirm-modal-message">Are you sure you want to permanently delete this item?</p>
+        </div>
+        <div class="flex items-center gap-3 w-full pt-2">
+          <button id="confirm-btn-cancel" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 rounded-xl font-outfit text-xs font-bold transition-all cursor-pointer">
+            Cancel
+          </button>
+          <button id="confirm-btn-action" class="flex-1 py-2.5 bg-rose-500 hover:bg-rose-600 active:scale-95 text-white rounded-xl font-outfit text-xs font-bold shadow-md transition-all cursor-pointer">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- APP CONTROLLER logic code -->
+    <script>
+      // ==============================================
+      // FIREBASE & CLOUD PERSISTENCE ENGINE
+      // ==============================================
+      const firebaseConfig = {
+        apiKey: "AIzaSyCnlAAe7e6kcH8UjFBa9LElAHgvl7Qnr-0",
+        authDomain: "gen-lang-client-0646437425.firebaseapp.com",
+        projectId: "gen-lang-client-0646437425",
+        storageBucket: "gen-lang-client-0646437425.firebasestorage.app",
+        messagingSenderId: "593178516320",
+        appId: "1:593178516320:web:4ee46fd9e05e742a811c05"
+      };
+
+      // Initialize Firebase
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      const auth = firebase.auth();
+      const db = firebase.firestore();
+
+      let userDocRef = null;
+      let unsubscribeUserDoc = null;
+      let authMode = 'login'; // 'login' or 'register'
+
+      // Keep references to original localStorage functions to bypass circular sync triggers
+      const originalSetItem = localStorage.setItem;
+      const originalRemoveItem = localStorage.removeItem;
+
+      // Override localStorage.setItem to automatically write to Firestore
+      localStorage.setItem = function(key, value) {
+        originalSetItem.apply(this, arguments);
+        if (userDocRef && (key === 'habits' || key === 'tasks' || key.startsWith('done_'))) {
+          saveLocalDataToFirestore();
+        }
+      };
+
+      // Override localStorage.removeItem to automatically write to Firestore
+      localStorage.removeItem = function(key) {
+        originalRemoveItem.apply(this, arguments);
+        if (userDocRef && (key === 'habits' || key === 'tasks' || key.startsWith('done_'))) {
+          saveLocalDataToFirestore();
+        }
+      };
+
+      function saveLocalDataToFirestore() {
+        if (!userDocRef) return;
+        
+        const habits = JSON.parse(localStorage.getItem('habits') || '[]');
+        const tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+        
+        // Gather all done_ keys from localStorage
+        const done = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('done_')) {
+            const dateStr = key.replace('done_', '');
+            try {
+              done[dateStr] = JSON.parse(localStorage.getItem(key) || '[]');
+            } catch (e) {
+              console.error(e);
+            }
+          }
+        }
+
+        // Save to user document
+        userDocRef.set({
+          habits: habits,
+          tasks: tasks,
+          done: done,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true }).catch(err => {
+          console.error("Error saving data to Firestore:", err);
+        });
+      }
+
+      function setupFirebaseSync(user) {
+        // Update UI initials
+        const initialsEl = document.getElementById('user-initials');
+        if (initialsEl) {
+          const email = user.email || "User";
+          const initials = email.substring(0, 2).toUpperCase();
+          initialsEl.innerText = initials;
+          initialsEl.title = email;
+        }
+
+        // Get user document ref
+        userDocRef = db.collection('users').doc(user.uid);
+        
+        // Listen to Firestore document
+        unsubscribeUserDoc = userDocRef.onSnapshot((docSnapshot) => {
+          if (docSnapshot.exists) {
+            const data = docSnapshot.data();
+            
+            // Update localStorage using originalSetItem to avoid recursive saving
+            if (data.habits) {
+              originalSetItem.call(localStorage, 'habits', JSON.stringify(data.habits));
+            } else {
+              originalRemoveItem.call(localStorage, 'habits');
+            }
+            
+            if (data.tasks) {
+              originalSetItem.call(localStorage, 'tasks', JSON.stringify(data.tasks));
+            } else {
+              originalRemoveItem.call(localStorage, 'tasks');
+            }
+
+            // Sync the done_ keys
+            // First, remove old done_ keys using originalRemoveItem
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && key.startsWith('done_')) {
+                originalRemoveItem.call(localStorage, key);
+                i--; // adjust index after removal
+              }
+            }
+
+            if (data.done) {
+              for (const dateStr in data.done) {
+                originalSetItem.call(localStorage, `done_${dateStr}`, JSON.stringify(data.done[dateStr]));
+              }
+            }
+
+            // Refresh UI of current active view
+            switchTab(currentActiveView);
+          } else {
+            // Document does not exist yet! This is a new user signup.
+            // Seed the onboarding data to localStorage
+            seedInitialOnboardingData();
+            
+            // Write to firestore immediately
+            saveLocalDataToFirestore();
+          }
+          
+          // Hide initial loading screen
+          document.getElementById('init-loader').classList.add('hidden');
+        }, (error) => {
+          console.error("Firestore sync error:", error);
+          document.getElementById('init-loader').classList.add('hidden');
+        });
+      }
+
+      function switchAuthTab(mode) {
+        authMode = mode;
+        const loginTab = document.getElementById('auth-tab-login');
+        const registerTab = document.getElementById('auth-tab-register');
+        const submitText = document.getElementById('auth-submit-text');
+        
+        if (mode === 'login') {
+          loginTab.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all text-white bg-[#5f5af6] shadow-md";
+          registerTab.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all text-slate-400 hover:text-white";
+          submitText.innerText = "Sign In";
+        } else {
+          registerTab.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all text-white bg-[#5f5af6] shadow-md";
+          loginTab.className = "flex-1 py-2 text-xs font-bold rounded-lg transition-all text-slate-400 hover:text-white";
+          submitText.innerText = "Create Account";
+        }
+        
+        // Hide error container on toggle
+        document.getElementById('auth-error-container').classList.add('hidden');
+      }
+
+      function handleAuthSubmit() {
+        const email = document.getElementById('auth-email').value.trim();
+        const password = document.getElementById('auth-password').value;
+        const errorContainer = document.getElementById('auth-error-container');
+        const errorText = document.getElementById('auth-error-text');
+        const spinner = document.getElementById('auth-submit-spinner');
+        const submitBtn = document.getElementById('auth-submit-btn');
+
+        if (!email || !password) {
+          errorText.innerText = "Please enter both Email and Password.";
+          errorContainer.classList.remove('hidden');
+          return;
+        }
+
+        if (password.length < 6) {
+          errorText.innerText = "Password must be at least 6 characters.";
+          errorContainer.classList.remove('hidden');
+          return;
+        }
+
+        // Show spinner
+        spinner.classList.remove('hidden');
+        submitBtn.disabled = true;
+        errorContainer.classList.add('hidden');
+
+        if (authMode === 'login') {
+          auth.signInWithEmailAndPassword(email, password)
+            .then(() => {
+              spinner.classList.add('hidden');
+              submitBtn.disabled = false;
+            })
+            .catch((error) => {
+              spinner.classList.add('hidden');
+              submitBtn.disabled = false;
+              errorText.innerText = error.message;
+              errorContainer.classList.remove('hidden');
+              lucide.createIcons();
+            });
+        } else {
+          auth.createUserWithEmailAndPassword(email, password)
+            .then(() => {
+              spinner.classList.add('hidden');
+              submitBtn.disabled = false;
+            })
+            .catch((error) => {
+              spinner.classList.add('hidden');
+              submitBtn.disabled = false;
+              errorText.innerText = error.message;
+              errorContainer.classList.remove('hidden');
+              lucide.createIcons();
+            });
+        }
+      }
+
+      function handleLogout() {
+        showCustomConfirm(
+          "Sign Out?",
+          "Are you sure you want to log out from PeakFlow? Your data is safely saved in the cloud.",
+          () => {
+            // Unsubscribe from database changes first
+            if (typeof unsubscribeUserDoc === 'function') {
+              unsubscribeUserDoc();
+            }
+            
+            // Log out from Firebase Auth
+            auth.signOut().then(() => {
+              // Clear current local storage completely of user data using originalRemoveItem
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key === 'habits' || key === 'tasks' || key.startsWith('done_') || key.startsWith('notified_reminders_'))) {
+                  originalRemoveItem.call(localStorage, key);
+                  i--; // adjust index
+                }
+              }
+
+              userDocRef = null;
+
+              // Switch UI
+              document.getElementById('main-card').classList.add('hidden');
+              document.getElementById('auth-card').classList.remove('hidden');
+              
+              // Clear inputs
+              document.getElementById('auth-email').value = '';
+              document.getElementById('auth-password').value = '';
+              document.getElementById('auth-error-container').classList.add('hidden');
+              
+              // Refresh Lucide
+              lucide.createIcons();
+            }).catch(err => {
+              console.error("Signout error:", err);
+            });
+          }
+        );
+      }
+
+      // Register Firebase Auth State Listener
+      auth.onAuthStateChanged((user) => {
+        if (user) {
+          // User is signed in!
+          document.getElementById('auth-card').classList.add('hidden');
+          document.getElementById('main-card').classList.remove('hidden');
+          
+          // Show initial loading screen while we fetch data from Firestore
+          document.getElementById('init-loader').classList.remove('hidden');
+          
+          setupFirebaseSync(user);
+        } else {
+          // User is signed out
+          document.getElementById('main-card').classList.add('hidden');
+          document.getElementById('auth-card').classList.remove('hidden');
+          document.getElementById('init-loader').classList.add('hidden');
+          lucide.createIcons();
+        }
+      });
+
+      // ==============================================
+      // ORIGINAL APP STATE CONFIGURATIONS
+      // ==============================================
+      // State configurations
+      let currentActiveView = 'today';
+      
+      const realToday = new Date();
+      const CURRENT_REAL_YEAR = realToday.getFullYear();
+      const CURRENT_REAL_MONTH = realToday.getMonth() + 1; // 1-indexed
+      const CURRENT_REAL_DAY = realToday.getDate();
+      const SELECTED_TODAY_STR = `${CURRENT_REAL_YEAR}-${String(CURRENT_REAL_MONTH).padStart(2, '0')}-${String(CURRENT_REAL_DAY).padStart(2, '0')}`;
+
+      let currentSelectedYear = CURRENT_REAL_YEAR;
+      let currentSelectedMonth = CURRENT_REAL_MONTH;
+
+      // Modal state configs
+      let currentModalStep = 1;
+      let modalHabitName = '';
+      let modalPriority = 'Medium';
+      let modalFrequency = 'Daily';
+      let modalCustomType = 'weekdays'; // 'weekdays' or 'count'
+      let modalCustomWeekdays = [1, 3, 5]; // Default Mon, Wed, Fri
+      let modalCustomCount = 3; // Default 3 days/week
+      let modalLocation = 'Anywhere';
+      let modalReminderTime = '08:00';
+
+
+      // Custom confirmation modal controller state
+      let customConfirmCallback = null;
+
+      function showCustomConfirm(title, message, onConfirm) {
+        document.getElementById('confirm-modal-title').innerText = title;
+        document.getElementById('confirm-modal-message').innerText = message;
+        customConfirmCallback = onConfirm;
+        document.getElementById('custom-confirm-modal').classList.remove('hidden');
+        lucide.createIcons();
+      }
+
+      function closeCustomConfirm() {
+        document.getElementById('custom-confirm-modal').classList.add('hidden');
+        customConfirmCallback = null;
+      }
+
+      const MONTH_NAMES_ENGLISH = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+
+      // Window setup on Document Load
+      window.addEventListener('DOMContentLoaded', () => {
+        // Bind custom confirm modal buttons
+        document.getElementById('confirm-btn-cancel').addEventListener('click', closeCustomConfirm);
+        document.getElementById('confirm-btn-action').addEventListener('click', () => {
+          if (typeof customConfirmCallback === 'function') {
+            customConfirmCallback();
+          }
+          closeCustomConfirm();
+        });
+
+        // Render Combined spiritual calendar details
+        renderHeaderDate();
+
+        // Ask for web alert notifications
+        requestNotificationAccess();
+
+        // Handle scheduled minute timer checking ticker
+        setInterval(checkActiveReminderTickers, 60000);
+        checkActiveReminderTickers();
+
+        // Bind touch move gestures for seamless swiping between screens!
+        setupTouchSwiping();
+      });
+
+      // Touch gestural swiping handler
+      function setupTouchSwiping() {
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const viewport = document.getElementById('tab-viewport');
+
+        viewport.addEventListener('touchstart', (e) => {
+          touchStartX = e.changedTouches[0].clientX;
+        }, { passive: true });
+
+        viewport.addEventListener('touchend', (e) => {
+          touchEndX = e.changedTouches[0].clientX;
+          const swipeThreshold = 65; // px requirement
+          const deltaX = touchEndX - touchStartX;
+
+          if (Math.abs(deltaX) < swipeThreshold) return;
+
+          const activeTabsList = ['today', 'habits', 'monthly'];
+          let currentIndex = activeTabsList.indexOf(currentActiveView);
+
+          if (deltaX > 0) {
+            // Swipe Right -> previous screen
+            if (currentIndex > 0) {
+              switchTab(activeTabsList[currentIndex - 1]);
+            }
+          } else {
+            // Swipe Left -> next screen
+            if (currentIndex < activeTabsList.length - 1) {
+              switchTab(activeTabsList[currentIndex + 1]);
+            }
+          }
+        }, { passive: true });
+      }
+
+      // Initial onboarding seed creator
+      function seedInitialOnboardingData() {
+        if (!localStorage.getItem('habits') && !localStorage.getItem('tasks')) {
+          const defaultHabits = [
+            {
+              id: 1718223000001,
+              name: "Surah Al-Mulk Reading",
+              priority: "High",
+              frequency: "Daily",
+              location: "Home",
+              reminderTime: "21:00"
+            },
+            {
+              id: 1718223000002,
+              name: "Morning Adhkar",
+              priority: "High",
+              frequency: "Daily",
+              location: "Anywhere",
+              reminderTime: "06:00"
+            },
+            {
+              id: 1718223000003,
+              name: "Charity / Sadaqah",
+              priority: "Low",
+              frequency: "Weekly",
+              location: "Anywhere",
+              reminderTime: "10:00"
+            }
+          ];
+
+          const defaultTasks = [
+            {
+              id: 1718223000005,
+              name: "Purchase Miswak",
+              priority: "Medium",
+              frequency: "Just Once",
+              location: "Office",
+              reminderTime: "17:00",
+              completed: false
+            }
+          ];
+
+          // Dynamically seed dates relative to today's date so user has initial statistics on whatever day they start
+          const d1 = new Date();
+          d1.setDate(d1.getDate() - 2);
+          const d2 = new Date();
+          d2.setDate(d2.getDate() - 1);
+          const d3 = new Date(); // today
+          
+          const dateStr1 = `${d1.getFullYear()}-${String(d1.getMonth() + 1).padStart(2, '0')}-${String(d1.getDate()).padStart(2, '0')}`;
+          const dateStr2 = `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}-${String(d2.getDate()).padStart(2, '0')}`;
+          const dateStr3 = `${d3.getFullYear()}-${String(d3.getMonth() + 1).padStart(2, '0')}-${String(d3.getDate()).padStart(2, '0')}`;
+
+          const pastDoneJune10 = ["Morning Adhkar"];
+          const pastDoneJune11 = ["Morning Adhkar", "Surah Al-Mulk Reading"];
+          const pastDoneJune12 = ["Morning Adhkar"];
+
+          localStorage.setItem('habits', JSON.stringify(defaultHabits));
+          localStorage.setItem('tasks', JSON.stringify(defaultTasks));
+          localStorage.setItem(`done_${dateStr1}`, JSON.stringify(pastDoneJune10));
+          localStorage.setItem(`done_${dateStr2}`, JSON.stringify(pastDoneJune11));
+          localStorage.setItem(`done_${dateStr3}`, JSON.stringify(pastDoneJune12));
+        }
+      }
+
+      function getFormattedHeaderDate(gregorianDate) {
+        try {
+          const weekdayOptions = { weekday: 'long' };
+          const dayOptions = { day: 'numeric' };
+          const monthOptions = { month: 'long' };
+          const yearOptions = { year: 'numeric' };
+
+          const weekday = gregorianDate.toLocaleDateString('en-US', weekdayOptions);
+          const day = gregorianDate.toLocaleDateString('en-US', dayOptions);
+          const month = gregorianDate.toLocaleDateString('en-US', monthOptions);
+          const year = gregorianDate.toLocaleDateString('en-US', yearOptions);
+
+          const englishFull = `${weekday}, ${day} ${month} ${year}`;
+
+          let hijriFull = "";
+          try {
+            const formatter = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura-nu-latn', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            });
+            const parts = formatter.formatToParts(gregorianDate);
+            const hDay = parts.find(p => p.type === 'day')?.value || '';
+            const hMonth = parts.find(p => p.type === 'month')?.value || '';
+            let hYear = parts.find(p => p.type === 'year')?.value || '';
+            if (hYear && !hYear.toLowerCase().includes('ah')) {
+              hYear = `${hYear} AH`;
+            }
+            hijriFull = `${hDay} ${hMonth} ${hYear}`;
+          } catch (hijriError) {
+            hijriFull = "29 Dhul-Hijjah 1447 AH";
+          }
+
+          return `${englishFull} • ${hijriFull}`;
+        } catch (err) {
+          return "Friday, 12 June 2026 • 26 Dhul-Hijjah 1447 AH";
+        }
+      }
+
+      function renderHeaderDate() {
+        const todayElement = new Date();
+        const formattedDateText = getFormattedHeaderDate(todayElement);
+        document.getElementById('header-date').innerText = formattedDateText;
+      }
+
+      function requestNotificationAccess() {
+        if ('Notification' in window) {
+          if (Notification.permission === 'default') {
+            Notification.requestPermission();
+          }
+        }
+      }
+
+      function checkActiveReminderTickers() {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const currentTimeString = `${hh}:${mm}`;
+
+        const habits = JSON.parse(localStorage.getItem('habits') || '[]');
+        const tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+
+        const todayNotificationKey = `notified_reminders_${SELECTED_TODAY_STR}`;
+        let notifiedList = JSON.parse(localStorage.getItem(todayNotificationKey) || '[]');
+        let notificationFired = false;
+
+        habits.forEach(habit => {
+          if (habit.reminderTime === currentTimeString) {
+            const uniqueIDStr = `habit_${habit.id}`;
+            if (!notifiedList.includes(uniqueIDStr)) {
+              triggerPushAlert(habit.name);
+              notifiedList.push(uniqueIDStr);
+              notificationFired = true;
+            }
+          }
+        });
+
+        tasks.forEach(task => {
+          if (!task.completed && task.reminderTime === currentTimeString) {
+            const uniqueIDStr = `task_${task.id}`;
+            if (!notifiedList.includes(uniqueIDStr)) {
+              triggerPushAlert(task.name);
+              notifiedList.push(uniqueIDStr);
+              notificationFired = true;
+            }
+          }
+        });
+
+        if (notificationFired) {
+          localStorage.setItem(todayNotificationKey, JSON.stringify(notifiedList));
+        }
+      }
+
+      function triggerPushAlert(titleStr) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(titleStr, {
+            body: "Time to complete your scheduled PeakFlow item!",
+            icon: "/favicon.ico"
+          });
+        } else {
+          console.log(`Alert Notification Trigger: ${titleStr}`);
+        }
+      }
+
+      function getDaysInMonthCount(year, month) {
+        return new Date(year, month, 0).getDate();
+      }
+
+      // Calculate Dynamic Active Habits Streak consecutively backwards from June 12, 2026
+      function calculateActiveStreak() {
+        let streak = 0;
+        let dateToCheck = new Date(CURRENT_REAL_YEAR, CURRENT_REAL_MONTH - 1, CURRENT_REAL_DAY);
+        
+        const todayStr = getFormattedDateStr(dateToCheck);
+        const todayDone = JSON.parse(localStorage.getItem(`done_${todayStr}`) || '[]');
+        
+        // If nothing complete today, active streak starts counting from yesterday
+        if (todayDone.length === 0) {
+          dateToCheck.setDate(dateToCheck.getDate() - 1);
+        }
+        
+        while (true) {
+          const curDateStr = getFormattedDateStr(dateToCheck);
+          const doneList = JSON.parse(localStorage.getItem(`done_${curDateStr}`) || '[]');
+          if (doneList.length > 0) {
+            streak++;
+            dateToCheck.setDate(dateToCheck.getDate() - 1);
+          } else {
+            break;
+          }
+          if (streak > 365) break; // Hard lock break
+        }
+        return streak;
+      }
+
+      function getFormattedDateStr(dateObj) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+
+      // Switch view tabs
+      function switchTab(targetTab) {
+        currentActiveView = targetTab;
+        
+        const tabs = ['today', 'habits', 'monthly'];
+        tabs.forEach(tab => {
+          const btn = document.getElementById(`tab-btn-${tab}`);
+          const section = document.getElementById(`view-${tab}`);
+          
+          if (tab === targetTab) {
+            btn.classList.add('text-white', 'active-nav-indicator');
+            btn.classList.remove('text-slate-400');
+            if (section) section.classList.remove('hidden');
+          } else {
+            btn.classList.remove('text-white', 'active-nav-indicator');
+            btn.classList.add('text-slate-400');
+            if (section) section.classList.add('hidden');
+          }
+        });
+
+        // Hide floating button on monthly/analytics panel
+        const btnFloating = document.getElementById('btn-add-floating');
+        if (targetTab === 'monthly') {
+          btnFloating.classList.add('hidden');
+        } else {
+          btnFloating.classList.remove('hidden');
+        }
+
+        // Render current elements
+        if (targetTab === 'today') renderTodayView();
+        if (targetTab === 'habits') renderHabitsView();
+        if (targetTab === 'monthly') renderMonthlyStatsView();
+
+        // Refresh Lucide icon library renders
+        lucide.createIcons();
+      }
+
+      /* ==============================================
+         CUSTOM ROUTINES SCHEDULING CONTROLS
+         ============================================== */
+      function getFriendlyFrequencyText(habit) {
+        if (!habit.frequency) return 'Daily';
+        if (habit.frequency !== 'Custom') {
+          return habit.frequency;
+        }
+        if (habit.customType === 'weekdays') {
+          const daysMap = {1:'M', 2:'T', 3:'W', 4:'T', 5:'F', 6:'S', 0:'S'};
+          const wDayArr = habit.customWeekdays || [];
+          const days = wDayArr.map(d => daysMap[d]).join(', ');
+          if (wDayArr.length === 7) return 'Daily (Custom)';
+          if (wDayArr.length === 5 && !wDayArr.includes(0) && !wDayArr.includes(6)) return 'Weekdays (M-F)';
+          return `Weekly: ${days}`;
+        }
+        if (habit.customType === 'count') {
+          return `${habit.customCount} days/week`;
+        }
+        return 'Custom';
+      }
+
+      function getStartAndEndOfWeek(date) {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday start
+        const start = new Date(d.setDate(diff));
+        start.setHours(0,0,0,0);
+        
+        const end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        end.setHours(23,59,59,999);
+        
+        return { start, end };
+      }
+
+      function getWeeklyCompletionCount(habitName, currentDate) {
+        const { start, end } = getStartAndEndOfWeek(currentDate);
+        let completionCount = 0;
+        
+        const checkDate = new Date(start);
+        for (let i = 0; i < 7; i++) {
+          const dateStr = getFormattedDateStr(checkDate);
+          const doneList = JSON.parse(localStorage.getItem(`done_${dateStr}`) || '[]');
+          if (doneList.includes(habitName)) {
+            completionCount++;
+          }
+          checkDate.setDate(checkDate.getDate() + 1);
+        }
+        return completionCount;
+      }
+
+      function isHabitScheduledForDate(habit, dateObj) {
+        if (!habit.frequency || habit.frequency === 'Daily') {
+          return true;
+        }
+        if (habit.frequency === 'Weekly') {
+          const createdDate = new Date(habit.id);
+          return dateObj.getDay() === createdDate.getDay();
+        }
+        if (habit.frequency === 'Monthly') {
+          const createdDate = new Date(habit.id);
+          return dateObj.getDate() === createdDate.getDate();
+        }
+        if (habit.frequency === 'Custom') {
+          if (habit.customType === 'weekdays') {
+            const weekdays = habit.customWeekdays || [];
+            return weekdays.includes(dateObj.getDay());
+          }
+          if (habit.customType === 'count') {
+            const totalThisWeek = getWeeklyCompletionCount(habit.name, dateObj);
+            const dateStr = getFormattedDateStr(dateObj);
+            const doneToday = JSON.parse(localStorage.getItem(`done_${dateStr}`) || '[]');
+            const completedToday = doneToday.includes(habit.name);
+            
+            return completedToday || (totalThisWeek < (habit.customCount || 3));
+          }
+        }
+        return true;
+      }
+
+      /* ==============================================
+         TODAY'S SCHEDULE RENDERING LOGIC
+         ============================================== */
+      function renderTodayView() {
+        const habits = JSON.parse(localStorage.getItem('habits') || '[]');
+        const tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+        const checkedList = JSON.parse(localStorage.getItem(`done_${SELECTED_TODAY_STR}`) || '[]');
+
+        const habitsContainer = document.getElementById('today-habits-list');
+        const tasksContainer = document.getElementById('today-tasks-list');
+
+        const todayDate = new Date(CURRENT_REAL_YEAR, CURRENT_REAL_MONTH - 1, CURRENT_REAL_DAY);
+        
+        // Filter habits relevant for today
+        const todaysHabitsList = habits.filter(habit => isHabitScheduledForDate(habit, todayDate));
+
+        // Filter single tasks relevant for today (either incomplete, or completed today)
+        const todaysTasksList = tasks.filter(task => {
+          if (!task.completed) return true;
+          return task.completedDate === SELECTED_TODAY_STR;
+        });
+
+        let totalExpectedItems = todaysHabitsList.length + todaysTasksList.length;
+        let totalCompletedItems = 0;
+
+        // Render Today's habits
+        if (todaysHabitsList.length === 0) {
+          habitsContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-7 px-4 bg-transparent border-2 border-dashed border-slate-800 rounded-2xl text-center space-y-1.5">
+              <i class="w-6 h-6 text-slate-500" data-lucide="bookmark-x"></i>
+              <p class="font-outfit text-xs font-semibold text-slate-400">No habit routines scheduled for today. Tap the + button!</p>
+            </div>
+          `;
+        } else {
+          habitsContainer.innerHTML = '';
+          todaysHabitsList.forEach(habit => {
+            const isCompleted = checkedList.includes(habit.name);
+            if (isCompleted) totalCompletedItems++;
+
+            let priorityBadgeColor = '';
+            if (habit.priority === 'High') priorityBadgeColor = 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+            else if (habit.priority === 'Medium') priorityBadgeColor = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+            else priorityBadgeColor = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+
+            const itemHTML = `
+              <div class="flex items-center justify-between bg-[#141b2c] p-3 px-3.5 rounded-xl border border-slate-800/80 shadow-sm hover:border-slate-700 transition-all">
+                <div class="flex items-center gap-3.5 flex-1 min-w-0 pr-1">
+                  
+                  <!-- Custom clear circular checkbox on left corner -->
+                  <button onclick="toggleHabitComplete('${habit.name}')" class="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isCompleted ? 'bg-greenAccent border-greenAccent text-slate-900 font-bold' : 'border-slate-700 hover:border-indigo-500'}">
+                    ${isCompleted ? '<i class="w-3.5 h-3.5 text-white" data-lucide="check"></i>' : ''}
+                  </button>
+                  
+                  <div class="min-w-0 flex-1">
+                    <span class="font-outfit text-sm font-semibold text-slate-200 block truncate ${isCompleted ? 'line-through text-slate-500' : ''}">
+                       ${habit.name}
+                    </span>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-[9px] uppercase font-bold tracking-wider text-indigo-400 bg-indigo-500/10 px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                        <i class="w-2.5 h-2.5" data-lucide="map-pin"></i> ${habit.location}
+                      </span>
+                      <span class="text-[9px] text-[#818cf8] font-semibold bg-indigo-500/10 px-1.5 py-0.2 rounded outline-none tracking-wider">${getFriendlyFrequencyText(habit)}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="flex flex-col items-end gap-1.5 shrink-0">
+                  <span class="text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-bold ${priorityBadgeColor}">
+                    ${habit.priority}
+                  </span>
+                  <span class="text-[9px] text-[#818cf8] font-bold flex items-center gap-0.5">
+                    <i class="w-2.5 h-2.5" data-lucide="bell"></i> ${habit.reminderTime}
+                  </span>
+                </div>
+              </div>
+            `;
+            habitsContainer.insertAdjacentHTML('beforeend', itemHTML);
+          });
+        }
+
+        // Render Today's tasks (single occurrences)
+        if (todaysTasksList.length === 0) {
+          tasksContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-6 px-4 bg-transparent border-2 border-dashed border-slate-800 rounded-2xl text-center">
+              <p class="font-outfit text-xs font-semibold text-slate-400">No single-occurrence tasks.</p>
+            </div>
+          `;
+        } else {
+          tasksContainer.innerHTML = '';
+          todaysTasksList.forEach(task => {
+            const isCompleted = task.completed;
+            if (isCompleted) totalCompletedItems++;
+
+            let priorityBadgeColor = '';
+            if (task.priority === 'High') priorityBadgeColor = 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+            else if (task.priority === 'Medium') priorityBadgeColor = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+            else priorityBadgeColor = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+
+            const itemHTML = `
+              <div class="flex items-center justify-between bg-[#141b2c] p-3 px-3.5 rounded-xl border border-slate-800/80 shadow-sm hover:border-slate-700 transition-all">
+                <div class="flex items-center gap-3.5 flex-1 min-w-0 pr-1">
+                  
+                  <!-- Custom clear circular checkbox on left corner -->
+                  <button onclick="toggleTaskComplete(${task.id})" class="w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${isCompleted ? 'bg-greenAccent border-greenAccent text-slate-900 font-bold' : 'border-slate-700 hover:border-indigo-500'}">
+                    ${isCompleted ? '<i class="w-3.5 h-3.5 text-white" data-lucide="check"></i>' : ''}
+                  </button>
+                  
+                  <div class="min-w-0 flex-1">
+                    <span class="font-outfit text-sm font-semibold text-slate-200 block truncate ${isCompleted ? 'line-through text-slate-500' : ''}">
+                      ${task.name}
+                    </span>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="text-[9px] uppercase font-bold tracking-wider text-amber-400 bg-amber-500/10 px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                        <i class="w-2.5 h-2.5" data-lucide="map-pin"></i> ${task.location}
+                      </span>
+                      <span class="text-[9px] text-indigo-400 font-semibold uppercase tracking-wider">Just Once</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="flex items-center gap-1.5 shrink-0">
+                  <div class="flex flex-col items-end gap-1.5">
+                    <span class="text-[8px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-bold ${priorityBadgeColor}">
+                      ${task.priority}
+                    </span>
+                    <span class="text-[9px] text-[#818cf8] font-bold flex items-center gap-0.5">
+                      <i class="w-2.5 h-2.5" data-lucide="bell"></i> ${task.reminderTime}
+                    </span>
+                  </div>
+                  <!-- Inline task deleter -->
+                  <button onclick="promptDeleteTask(${task.id})" class="text-slate-400 hover:text-redAccent transition-all p-1.5 ml-1" title="Delete Task">
+                     <i class="w-4 h-4" data-lucide="trash-2"></i>
+                  </button>
+                </div>
+              </div>
+            `;
+            tasksContainer.insertAdjacentHTML('beforeend', itemHTML);
+          });
+        }
+
+        // Global Active STREAK renderer
+        const streakVal = calculateActiveStreak();
+        document.getElementById('streak-days').innerText = streakVal;
+
+        // Dynamic Momentum logic updates
+        const remaining = totalExpectedItems - totalCompletedItems;
+        document.getElementById('today-progress-stats').innerText = remaining <= 0 ? "All tasks completed! 🎉" : `${remaining} Tasks Remaining`;
+
+        const percentageRatio = totalExpectedItems > 0 ? (totalCompletedItems / totalExpectedItems) * 100 : 0;
+        document.getElementById('gauge-text').innerText = `${Math.round(percentageRatio)}%`;
+        
+        const circleOffset = 163.36 - (163.36 * percentageRatio) / 100;
+        document.getElementById('gauge-circle').setAttribute('stroke-dashoffset', circleOffset);
+      }
+
+      function toggleHabitComplete(habitName) {
+        const doneKey = `done_${SELECTED_TODAY_STR}`;
+        let doneList = JSON.parse(localStorage.getItem(doneKey) || '[]');
+
+        if (doneList.includes(habitName)) {
+          doneList = doneList.filter(name => name !== habitName);
+        } else {
+          doneList.push(habitName);
+        }
+
+        localStorage.setItem(doneKey, JSON.stringify(doneList));
+        renderTodayView();
+        lucide.createIcons();
+      }
+
+      function toggleTaskComplete(taskId) {
+        let tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+        tasks = tasks.map(task => {
+          if (task.id === taskId) {
+            task.completed = !task.completed;
+            task.completedDate = task.completed ? SELECTED_TODAY_STR : null;
+          }
+          return task;
+        });
+
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+        renderTodayView();
+        lucide.createIcons();
+      }
+
+      function promptDeleteTask(taskId) {
+        showCustomConfirm(
+          "Delete Task?",
+          "Are you sure you want to permanently delete this task?",
+          () => {
+            let tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+            tasks = tasks.filter(task => task.id !== taskId);
+            localStorage.setItem('tasks', JSON.stringify(tasks));
+            renderTodayView();
+            lucide.createIcons();
+          }
+        );
+      }
+
+      /* ==============================================
+         HABITS DATABASE VIEW ACTIONS
+         ============================================== */
+      function renderHabitsView() {
+        const habits = JSON.parse(localStorage.getItem('habits') || '[]');
+        const container = document.getElementById('habits-list-all');
+
+        if (habits.length === 0) {
+          container.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-12 px-4 bg-transparent border-2 border-dashed border-slate-800 rounded-2xl text-center space-y-2">
+              <i class="w-10 h-10 text-slate-500" data-lucide="notepad-text"></i>
+              <h4 class="font-outfit text-sm font-bold text-slate-300">No active routines</h4>
+              <p class="font-outfit text-xs text-slate-400">Tap the active + to schedule steady routines.</p>
+            </div>
+          `;
+        } else {
+          container.innerHTML = '';
+          habits.forEach(habit => {
+            let priorityBadgeColor = '';
+            if (habit.priority === 'High') priorityBadgeColor = 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+            else if (habit.priority === 'Medium') priorityBadgeColor = 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+            else priorityBadgeColor = 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20';
+
+            const habitCard = `
+              <div class="bg-[#141b2c] p-4 rounded-2xl border border-slate-800/80 shadow-sm space-y-3 relative overflow-hidden group hover:border-indigo-500/40 transition-colors">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h4 class="font-outfit text-sm font-bold text-white leading-tight">${habit.name}</h4>
+                    <div class="flex flex-wrap gap-1.5 mt-2">
+                      <span class="text-[9px] uppercase tracking-wider font-extrabold text-[#818cf8] bg-[#5f5af6]/10 px-2 py-0.5 rounded-md">
+                        ${getFriendlyFrequencyText(habit)}
+                      </span>
+                      <span class="text-[9px] uppercase tracking-wider font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md flex items-center gap-0.5">
+                        <i class="w-2.5 h-2.5" data-lucide="map-pin"></i> ${habit.location}
+                      </span>
+                    </div>
+                  </div>
+                  <!-- Action Delete -->
+                  <button onclick="promptDeleteHabit(${habit.id})" class="text-slate-500 hover:text-redAccent transition-colors p-1" title="Delete Habit">
+                    <i class="w-4 h-4" data-lucide="trash-2"></i>
+                  </button>
+                </div>
+
+                <div class="flex justify-between items-center pt-2 border-t border-slate-800 text-[10px] text-slate-400">
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-medium">Priority:</span>
+                    <span class="font-bold uppercase ${priorityBadgeColor} px-2 py-0.2 rounded-full text-[8.5px]">
+                      ${habit.priority}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-1 font-bold text-[#818cf8]">
+                    <i class="w-3.5 h-3.5" data-lucide="clock"></i> ${habit.reminderTime}
+                  </div>
+                </div>
+              </div>
+            `;
+            container.insertAdjacentHTML('beforeend', habitCard);
+          });
+        }
+      }
+
+      function promptDeleteHabit(habitId) {
+        showCustomConfirm(
+          "Delete Habit?",
+          "Are you sure you want to permanently delete this habit? Dynamic calendars preserve history, but future checklists will stop.",
+          () => {
+            let habits = JSON.parse(localStorage.getItem('habits') || '[]');
+            habits = habits.filter(habit => habit.id !== habitId);
+            localStorage.setItem('habits', JSON.stringify(habits));
+            renderHabitsView();
+            lucide.createIcons();
+          }
+        );
+      }
+
+      /* ==============================================
+         MONTHLY ANALYTICS & CALENDARS VISUALS
+         ============================================== */
+      function renderMonthlyStatsView() {
+        // Output title header format
+        document.getElementById('monthly-navigation-header').innerText = `${MONTH_NAMES_ENGLISH[currentSelectedMonth - 1]} • ${currentSelectedYear}`;
+
+        const habits = JSON.parse(localStorage.getItem('habits') || '[]');
+        const monthlyHabitsContainer = document.getElementById('monthly-habits-container');
+
+        let totalDoneBoxes = 0;
+        let totalPastExpectedBoxes = 0;
+
+        // Populate location distribution donut chart
+        renderLocationDistributionChart();
+
+        if (habits.length === 0) {
+          monthlyHabitsContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-10 px-4 bg-transparent border-2 border-dashed border-slate-800 rounded-2xl text-center space-y-1">
+              <i class="w-8 h-8 text-slate-500" data-lucide="calendar"></i>
+              <p class="font-outfit text-xs font-semibold text-slate-400">No habits recorded yet.</p>
+            </div>
+          `;
+          document.getElementById('stat-total-done').innerText = '0';
+          document.getElementById('stat-total-missed').innerText = '0';
+          renderEmptyBarChart();
+          return;
+        }
+
+        monthlyHabitsContainer.innerHTML = '';
+        const daysInSelectedMonth = getDaysInMonthCount(currentSelectedYear, currentSelectedMonth);
+
+        habits.forEach(habit => {
+          let habitsDoneForThisRow = 0;
+          let habitsMissedForThisRow = 0;
+          let gridBoxesHTML = '';
+          
+          for (let day = 1; day <= daysInSelectedMonth; day++) {
+            const dateStr = `${currentSelectedYear}-${String(currentSelectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const isFuture = checkIsDateInFuture(currentSelectedYear, currentSelectedMonth, day);
+            
+            if (isFuture) {
+              gridBoxesHTML += `
+                <div class="w-6 h-6 rounded flex items-center justify-center text-[9px] font-bold border border-dashed border-slate-700 text-slate-500 bg-transparent" title="Future: ${dateStr}">
+                  ${day}
+                </div>
+              `;
+            } else {
+              const doneArray = JSON.parse(localStorage.getItem(`done_${dateStr}`) || '[]');
+              const hasCompleted = doneArray.includes(habit.name);
+
+              if (hasCompleted) {
+                habitsDoneForThisRow++;
+                totalDoneBoxes++;
+                gridBoxesHTML += `
+                  <div class="w-6 h-6 rounded flex items-center justify-center text-[9px] font-bold bg-greenAccent text-slate-900 border border-transparent shadow-sm" title="Done: ${dateStr}">
+                    ${day}
+                  </div>
+                `;
+              } else {
+                const boxDate = new Date(currentSelectedYear, currentSelectedMonth - 1, day);
+                const isScheduled = isHabitScheduledForDate(habit, boxDate);
+                
+                if (isScheduled) {
+                  habitsMissedForThisRow++;
+                  totalPastExpectedBoxes++;
+                  gridBoxesHTML += `
+                    <div class="w-6 h-6 rounded flex items-center justify-center text-[9px] font-bold bg-[#f43f5e]/15 text-rose-450 border border-rose-500/20 shadow-sm" style="color: #fda4af;" title="Missed: ${dateStr}">
+                      ${day}
+                    </div>
+                  `;
+                } else {
+                  gridBoxesHTML += `
+                    <div class="w-6 h-6 rounded flex items-center justify-center text-[9px] font-medium text-slate-600 bg-slate-900/40 border border-slate-800/40" title="Rest Day: ${dateStr}">
+                      -
+                    </div>
+                  `;
+                }
+              }
+            }
+          }
+
+          let daysPassedCount = habitsDoneForThisRow + habitsMissedForThisRow;
+          let dedicationPercent = daysPassedCount > 0 ? (habitsDoneForThisRow / daysPassedCount) * 100 : 0;
+          let roundedDedication = Math.round(dedicationPercent);
+
+          let dedicationBarColor = 'bg-rose-500';
+          let dedicationTextColor = 'text-rose-400';
+          if (roundedDedication >= 75) {
+            dedicationBarColor = 'bg-greenAccent';
+            dedicationTextColor = 'text-greenAccent';
+          } else if (roundedDedication >= 50) {
+            dedicationBarColor = 'bg-[#818cf8]';
+            dedicationTextColor = 'text-[#818cf8]';
+          }
+
+          const blockHTML = `
+            <div class="bg-[#131b2e] p-3.5 border border-slate-800 rounded-2xl shadow-sm space-y-3.5">
+              <div class="flex justify-between items-center border-b border-slate-800/80 pb-2">
+                <span class="font-outfit text-xs font-bold text-slate-100 truncate pr-2 max-w-[240px]">
+                  ${habit.name}
+                </span>
+                <span class="text-[9px] font-bold ${dedicationTextColor} uppercase tracking-wider bg-slate-800/50 border border-slate-800 px-2 py-0.5 rounded">
+                  Dedication: ${roundedDedication}%
+                </span>
+              </div>
+              
+              <div class="flex flex-wrap gap-[4.5px] justify-start py-1">
+                ${gridBoxesHTML}
+              </div>
+
+              <!-- Compact horizontal status gauge -->
+              <div class="space-y-1">
+                <div class="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                  <div class="h-full ${dedicationBarColor} progress-transition" style="width: ${roundedDedication}%"></div>
+                </div>
+              </div>
+            </div>
+          `;
+          monthlyHabitsContainer.insertAdjacentHTML('beforeend', blockHTML);
+        });
+
+        // Sync visual stats boxes
+        document.getElementById('stat-total-done').innerText = totalDoneBoxes;
+        document.getElementById('stat-total-missed').innerText = totalPastExpectedBoxes;
+
+        // Render dashboard grids also (top of view-monthly section)
+        const streakVal = calculateActiveStreak();
+        document.getElementById('streak-days-stat').innerText = streakVal;
+        
+        // Productive index: count days of month with at least 1 checked habit block
+        let productiveDays = 0;
+        for (let day = 1; day <= daysInSelectedMonth; day++) {
+          const checkKey = `done_${currentSelectedYear}-${String(currentSelectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const checked = JSON.parse(localStorage.getItem(checkKey) || '[]');
+          if (checked.length > 0) {
+            productiveDays++;
+          }
+        }
+        document.getElementById('productive-days-stat').innerText = productiveDays;
+
+        // Render visual vertical activity density graph
+        renderMonthlyBarChart(daysInSelectedMonth, habits);
+      }
+
+      function renderLocationDistributionChart() {
+        const habits = JSON.parse(localStorage.getItem('habits') || '[]');
+        const tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+        const allItems = [...habits, ...tasks];
+        
+        let homeCount = allItems.filter(item => item.location === 'Home').length;
+        let anywhereCount = allItems.filter(item => item.location === 'Anywhere').length;
+        let officeCount = allItems.filter(item => item.location === 'Office').length;
+        
+        const total = homeCount + anywhereCount + officeCount;
+        const chartWrapper = document.getElementById('folder-distribution-chart-wrapper');
+        if (!chartWrapper) return;
+        
+        if (total === 0) {
+          chartWrapper.innerHTML = `<p class="text-xs text-slate-400 py-3">Add location settings to compute distribution</p>`;
+          return;
+        }
+
+        const homePct = (homeCount / total) * 100;
+        const anywherePct = (anywhereCount / total) * 100;
+        const officePct = (officeCount / total) * 100;
+
+        const radius = 30;
+        const circumference = 2 * Math.PI * radius; // ~188.49
+
+        const hStroke = (homePct / 100) * circumference;
+        const aStroke = (anywherePct / 100) * circumference;
+        const oStroke = (officePct / 100) * circumference;
+
+        const hOffset = 0;
+        const aOffset = hStroke;
+        const oOffset = hStroke + aStroke;
+
+        chartWrapper.innerHTML = `
+          <div class="relative w-28 h-28 flex items-center justify-center shrink-0">
+            <svg class="w-28 h-28 transform -rotate-90">
+              <!-- Home Segment (Indigo) -->
+              ${homeCount > 0 ? `
+                <circle cx="56" cy="56" r="${radius}" stroke="#6366f1" stroke-width="7" fill="transparent" 
+                        stroke-dasharray="${hStroke} ${circumference}" stroke-dashoffset="${-hOffset}" />
+              ` : ''}
+              <!-- Anywhere Segment (Emerald) -->
+              ${anywhereCount > 0 ? `
+                <circle cx="56" cy="56" r="${radius}" stroke="#10b981" stroke-width="7" fill="transparent" 
+                        stroke-dasharray="${aStroke} ${circumference}" stroke-dashoffset="${-aOffset}" />
+              ` : ''}
+              <!-- Office Segment (Amber) -->
+              ${officeCount > 0 ? `
+                <circle cx="56" cy="56" r="${radius}" stroke="#f59e0b" stroke-width="7" fill="transparent" 
+                        stroke-dasharray="${oStroke} ${circumference}" stroke-dashoffset="${-oOffset}" />
+              ` : ''}
+            </svg>
+            <div class="absolute text-center select-none">
+              <span class="text-[8px] text-slate-400 uppercase tracking-widest font-bold block">Total</span>
+              <span class="text-base font-extrabold text-white">${total}</span>
+            </div>
+          </div>
+          
+          <div class="flex-1 flex flex-col gap-2 select-none">
+            <div class="flex items-center gap-2 justify-between">
+              <div class="flex items-center gap-1.5 text-xs text-slate-300">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#6366f1] inline-block shadow-sm"></span>
+                <span>Home</span>
+              </div>
+              <span class="text-xs font-bold text-slate-200">${homeCount}</span>
+            </div>
+            <div class="flex items-center gap-2 justify-between">
+              <div class="flex items-center gap-1.5 text-xs text-slate-300">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#10b981] inline-block shadow-sm"></span>
+                <span>Anywhere</span>
+              </div>
+              <span class="text-xs font-bold text-slate-200">${anywhereCount}</span>
+            </div>
+            <div class="flex items-center gap-2 justify-between">
+              <div class="flex items-center gap-1.5 text-xs text-slate-300">
+                <span class="w-2.5 h-2.5 rounded-full bg-[#f59e0b] inline-block shadow-sm"></span>
+                <span>Office</span>
+              </div>
+              <span class="text-xs font-bold text-slate-200">${officeCount}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderMonthlyBarChart(totalDaysCount, habitsList) {
+        const chartWrapper = document.getElementById('monthly-bar-chart');
+        chartWrapper.innerHTML = '';
+
+        let maxHabitValue = habitsList.length;
+        if (maxHabitValue === 0) maxHabitValue = 1;
+
+        for (let day = 1; day <= totalDaysCount; day++) {
+          const dateStr = `${currentSelectedYear}-${String(currentSelectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const isFuture = checkIsDateInFuture(currentSelectedYear, currentSelectedMonth, day);
+          const isTodayCheck = (currentSelectedYear === CURRENT_REAL_YEAR && currentSelectedMonth === CURRENT_REAL_MONTH && day === CURRENT_REAL_DAY);
+
+          let barHeightPercent = 0;
+          let completedCount = 0;
+
+          if (!isFuture) {
+            const completions = JSON.parse(localStorage.getItem(`done_${dateStr}`) || '[]');
+            completedCount = completions.filter(name => habitsList.some(h => h.name === name)).length;
+            barHeightPercent = (completedCount / maxHabitValue) * 100;
+          }
+
+          let barColorClasses = 'bg-greenAccent'; // Done
+          if (isTodayCheck) {
+            barColorClasses = 'bg-[#5f5af6] animate-pulse'; // Today
+          } else if (isFuture) {
+            barColorClasses = 'bg-transparent border border-dashed border-slate-700'; // Future
+          }
+
+          const columnHTML = `
+            <div class="flex-1 flex flex-col items-center justify-end h-full gap-1 min-w-[7px]">
+              <div class="w-full rounded-t-sm transition-all duration-500 hover:brightness-110 relative group" 
+                   style="height: ${isFuture ? '0%' : barHeightPercent + '%'}; min-height: ${isFuture ? '0px' : '4px'}">
+                
+                <div class="w-full h-full ${barColorClasses} rounded-t-sm shadow-sm"></div>
+
+                <!-- Tooltip hover -->
+                <div class="absolute bottom-full mb-1.5 hidden group-hover:block bg-[#020617] border border-slate-800 text-slate-200 font-outfit text-[8px] font-bold p-1 rounded shadow-md z-30 pointer-events-none whitespace-nowrap">
+                   Day ${day}: ${completedCount}/${maxHabitValue}
+                </div>
+              </div>
+              <span class="text-[7.5px] font-semibold text-slate-500 font-mono tracking-tight">${day}</span>
+            </div>
+          `;
+          chartWrapper.insertAdjacentHTML('beforeend', columnHTML);
+        }
+      }
+
+      function renderEmptyBarChart() {
+        const chartWrapper = document.getElementById('monthly-bar-chart');
+        chartWrapper.innerHTML = `
+          <div class="w-full h-full flex items-center justify-center py-6">
+            <span class="font-outfit text-xs text-slate-500">No charts available</span>
+          </div>
+        `;
+      }
+
+      function checkIsDateInFuture(year, month, day) {
+        if (year > CURRENT_REAL_YEAR) return true;
+        if (year < CURRENT_REAL_YEAR) return false;
+        if (month > CURRENT_REAL_MONTH) return true;
+        if (month < CURRENT_REAL_MONTH) return false;
+        return day > CURRENT_REAL_DAY;
+      }
+
+      function navigateMonth(offset) {
+        let newMonth = currentSelectedMonth + offset;
+        let newYear = currentSelectedYear;
+
+        if (newMonth > 12) {
+          newMonth = 1;
+          newYear++;
+        } else if (newMonth < 1) {
+          newMonth = 12;
+          newYear--;
+        }
+
+        currentSelectedMonth = newMonth;
+        currentSelectedYear = newYear;
+
+        renderMonthlyStatsView();
+        lucide.createIcons();
+      }
+
+      /* ==============================================
+         MULTI-STEP WIZARDS & CREATIVE POPUPS
+         ============================================== */
+      function openModal() {
+        currentModalStep = 1;
+        modalHabitName = '';
+        modalPriority = 'Medium';
+        modalFrequency = 'Daily';
+        modalCustomType = 'weekdays';
+        modalCustomWeekdays = [1, 3, 5];
+        modalCustomCount = 3;
+        modalLocation = 'Anywhere';
+        modalReminderTime = '08:00';
+
+        document.getElementById('habit-name-input').value = '';
+        showStepForm(1);
+
+        const dialog = document.getElementById('modal-add-step');
+        dialog.classList.remove('hidden');
+      }
+
+      function closeModal() {
+        const dialog = document.getElementById('modal-add-step');
+        dialog.classList.add('hidden');
+      }
+
+      function showStepForm(index) {
+        currentModalStep = index;
+
+        document.getElementById('modal-step-title').innerText = `Step ${index} of 5`;
+
+        for (let i = 1; i <= 6; i++) {
+          const pane = document.getElementById(`step-pane-${i}`);
+          if (pane) {
+            if (i === index) pane.classList.remove('hidden');
+            else pane.classList.add('hidden');
+          }
+        }
+
+        const navFooter = document.getElementById('modal-step-nav');
+        const bskBtn = document.getElementById('modal-btn-back');
+        const nxtBtn = document.getElementById('modal-btn-next');
+
+        if (index === 6) {
+          navFooter.classList.add('hidden');
+        } else {
+          navFooter.classList.remove('hidden');
+          bskBtn.disabled = (index === 1);
+          
+          if (index === 5) {
+            nxtBtn.innerText = 'Confirm';
+            nxtBtn.classList.add('bg-greenAccent');
+            nxtBtn.classList.remove('bg-[#5f5af6]');
+          } else {
+            nxtBtn.innerText = 'Next';
+            nxtBtn.classList.remove('bg-greenAccent');
+            nxtBtn.classList.add('bg-[#5f5af6]');
+          }
+        }
+
+        renderConfigBadges();
+        validateStep();
+      }
+
+      function navigateStep(direction) {
+        const target = currentModalStep + direction;
+        if (target < 1) return;
+
+        if (direction === 1) {
+          if (currentModalStep === 1) {
+            modalHabitName = document.getElementById('habit-name-input').value.trim();
+          }
+          if (currentModalStep === 5) {
+            modalReminderTime = document.getElementById('reminder-time-input').value;
+            saveNewItem();
+            showStepForm(6);
+            
+            setTimeout(() => {
+              closeModal();
+              switchTab(currentActiveView);
+            }, 1400);
+            return;
+          }
+        }
+
+        showStepForm(target);
+        lucide.createIcons();
+      }
+
+      function validateStep() {
+        const nextButton = document.getElementById('modal-btn-next');
+        if (currentModalStep === 1) {
+          const content = document.getElementById('habit-name-input').value.trim();
+          nextButton.disabled = (content.length === 0);
+        } else {
+          nextButton.disabled = false;
+        }
+
+        // Pagination tracker dot renderers
+        const dotsContainer = document.getElementById('step-dots-container');
+        dotsContainer.innerHTML = '';
+        for (let i = 1; i <= 5; i++) {
+          const active = (i === currentModalStep);
+          dotsContainer.insertAdjacentHTML('beforeend', `
+            <span class="w-1.5 h-1.5 rounded-full transition-all duration-300 ${active ? 'bg-[#5f5af6] w-3.5' : 'bg-slate-700'}"></span>
+          `);
+        }
+      }
+
+      function setPriority(level) {
+        modalPriority = level;
+        renderConfigBadges();
+      }
+
+      function setFrequency(freq) {
+        modalFrequency = freq;
+        renderConfigBadges();
+      }
+
+      function setCustomType(type) {
+        modalCustomType = type;
+        const wBtn = document.getElementById('custom-type-weekdays-btn');
+        const cBtn = document.getElementById('custom-type-count-btn');
+        const wView = document.getElementById('custom-weekdays-view');
+        const cView = document.getElementById('custom-count-view');
+        
+        if (type === 'weekdays') {
+          if (wBtn) wBtn.className = "px-2 py-1 text-[8.5px] font-bold rounded transition-all bg-[#5f5af6] text-white shadow";
+          if (cBtn) cBtn.className = "px-2 py-1 text-[8.5px] font-bold rounded transition-all text-slate-400 hover:text-white";
+          if (wView) wView.classList.remove('hidden');
+          if (cView) cView.classList.add('hidden');
+        } else {
+          if (cBtn) cBtn.className = "px-2 py-1 text-[8.5px] font-bold rounded transition-all bg-[#5f5af6] text-white shadow";
+          if (wBtn) wBtn.className = "px-2 py-1 text-[8.5px] font-bold rounded transition-all text-slate-400 hover:text-white";
+          if (cView) cView.classList.remove('hidden');
+          if (wView) wView.classList.add('hidden');
+        }
+        renderConfigBadges();
+      }
+
+      function toggleCustomWeekday(day) {
+        if (modalCustomWeekdays.includes(day)) {
+          if (modalCustomWeekdays.length > 1) {
+            modalCustomWeekdays = modalCustomWeekdays.filter(d => d !== day);
+          }
+        } else {
+          modalCustomWeekdays.push(day);
+          modalCustomWeekdays.sort((a, b) => a - b);
+        }
+        renderConfigBadges();
+      }
+
+      function setCustomCount(count) {
+        modalCustomCount = count;
+        const summary = document.getElementById('custom-count-summary');
+        if (summary) summary.innerText = `Goal: ${count} day${count > 1 ? 's' : ''} per week`;
+        renderConfigBadges();
+      }
+
+      function setLocation(loc) {
+        modalLocation = loc;
+        renderConfigBadges();
+      }
+
+      // Sync badging button styles
+      function renderConfigBadges() {
+        const priorities = ['High', 'Medium', 'Low'];
+        priorities.forEach(p => {
+          const btn = document.getElementById(`prio-${p}-btn`);
+          if (!btn) return;
+          if (p === modalPriority) {
+            if (p === 'High') {
+              btn.className = "py-2.5 rounded-xl border border-transparent text-xs font-bold bg-[#f43f5e] text-white shadow-md scale-105 transition-all text-center";
+            } else if (p === 'Medium') {
+              btn.className = "py-2.5 rounded-xl border border-transparent text-xs font-bold bg-[#f59e0b] text-white shadow-md scale-105 transition-all text-center";
+            } else {
+              btn.className = "py-2.5 rounded-xl border border-transparent text-xs font-bold bg-greenAccent text-slate-900 shadow-md scale-105 transition-all text-center";
+            }
+          } else {
+            if (p === 'High') btn.className = "py-2.5 rounded-xl border border-rose-900/40 text-xs font-semibold bg-[#f43f5e]/10 text-rose-400 hover:bg-[#f43f5e]/20 transition-all text-center";
+            else if (p === 'Medium') btn.className = "py-2.5 rounded-xl border border-amber-900/40 text-xs font-semibold bg-[#f59e0b]/10 text-amber-400 hover:bg-[#f59e0b]/20 transition-all text-center";
+            else btn.className = "py-2.5 rounded-xl border border-emerald-900/40 text-xs font-semibold bg-[#10b981]/10 text-emerald-450 hover:bg-[#10b981]/20 transition-all text-center";
+          }
+        });
+
+        const freqs = ['Daily', 'Weekly', 'Monthly', 'Just Once', 'Custom'];
+        freqs.forEach(f => {
+          const btn = document.getElementById(`freq-${f}-btn`);
+          if (!btn) return;
+          if (f === modalFrequency) {
+            if (f === 'Custom') {
+              btn.className = "col-span-2 py-2.5 rounded-xl border border-transparent text-xs font-bold bg-gradient-to-r from-[#5f5af6] to-[#7b75ff] text-white shadow-md scale-[1.01] transition-all text-center flex items-center justify-center gap-1.5";
+            } else {
+              btn.className = "py-2 rounded-xl border border-transparent text-xs font-bold bg-gradient-to-r from-[#5f5af6] to-[#7b75ff] text-white shadow-md scale-[1.03] transition-all text-center";
+            }
+          } else {
+            if (f === 'Custom') {
+              btn.className = "col-span-2 py-2.5 rounded-xl border border-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition-all text-center flex items-center justify-center gap-1.5";
+            } else {
+              btn.className = "py-2 rounded-xl border border-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-850 transition-all text-center";
+            }
+          }
+        });
+
+        const subpanel = document.getElementById('custom-freq-subpanel');
+        if (subpanel) {
+          if (modalFrequency === 'Custom') {
+            subpanel.classList.remove('hidden');
+          } else {
+            subpanel.classList.add('hidden');
+          }
+        }
+
+        // Sync custom weekdays
+        for (let i = 0; i < 7; i++) {
+          const btn = document.getElementById(`wd-${i}`);
+          if (btn) {
+            if (modalCustomWeekdays.includes(i)) {
+              btn.className = "w-7 h-7 rounded-full border border-transparent text-[10px] font-bold bg-[#5f5af6] text-white shadow-sm flex items-center justify-center transition-all scale-105";
+            } else {
+              btn.className = "w-7 h-7 rounded-full border border-slate-800 text-[10px] font-semibold text-slate-400 flex items-center justify-center transition-all hover:bg-slate-800 hover:text-white";
+            }
+          }
+        }
+
+        // Sync custom counts
+        for (let i = 1; i <= 7; i++) {
+          const btn = document.getElementById(`cc-${i}`);
+          if (btn) {
+            if (modalCustomCount === i) {
+              btn.className = "flex-1 py-1 px-1.5 rounded-md border border-transparent text-[9px] font-bold bg-[#5f5af6]/30 text-indigo-300 shadow-sm transition-all";
+            } else {
+              btn.className = "flex-1 py-1 px-1.5 rounded-md border border-slate-800 text-[9px] font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition-all";
+            }
+          }
+        }
+
+        const locs = ['Home', 'Anywhere', 'Office'];
+        locs.forEach(l => {
+          const btn = document.getElementById(`loc-${l}-btn`);
+          if (!btn) return;
+          if (l === modalLocation) {
+            btn.className = "py-2.5 rounded-xl border border-transparent text-xs font-bold bg-gradient-to-r from-[#5f5af6] to-[#7b75ff] text-white shadow-md scale-[1.03] transition-all text-center";
+          } else {
+            btn.className = "py-2.5 rounded-xl border border-slate-800 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition-all text-center";
+          }
+        });
+      }
+
+      function saveNewItem() {
+        const newItem = {
+          id: Date.now(),
+          name: modalHabitName,
+          priority: modalPriority,
+          frequency: modalFrequency,
+          location: modalLocation,
+          reminderTime: modalReminderTime
+        };
+
+        if (modalFrequency === 'Custom') {
+          newItem.customType = modalCustomType;
+          newItem.customWeekdays = [...modalCustomWeekdays];
+          newItem.customCount = modalCustomCount;
+        }
+
+        if (modalFrequency === 'Just Once') {
+          const tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+          newItem.completed = false;
+          newItem.date = SELECTED_TODAY_STR; // Lock-in the date of scheduled task
+          tasks.push(newItem);
+          localStorage.setItem('tasks', JSON.stringify(tasks));
+        } else {
+          const habits = JSON.parse(localStorage.getItem('habits') || '[]');
+          habits.push(newItem);
+          localStorage.setItem('habits', JSON.stringify(habits));
+        }
+      }
+    </script>
+  </body>
+</html>
