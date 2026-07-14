@@ -678,7 +678,7 @@
       }
       const auth = firebase.auth();
       // Connect to the specific Firestore database matching the project configuration
-      const db = firebase.app().firestore("ai-studio-habittracker-b74a39ef-c612-409e-9443-e6998a2c5850");
+      const db = firebase.firestore();
 
       let userDocRef = null;
       let unsubscribeUserDoc = null;
