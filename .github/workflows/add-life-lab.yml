@@ -1,0 +1,211 @@
+name: Add Life Lab
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add Life Lab to the existing app
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          text = p.read_text(encoding='utf-8')
+          marker = '<!-- LIFE-LAB-V1 -->'
+          if marker in text:
+              print('Life Lab already installed.')
+              raise SystemExit(0)
+
+          block = r'''<!-- LIFE-LAB-V1 -->
+          <button id="life-lab-launcher" onclick="openLifeLab()" class="fixed left-4 bottom-7 z-[80] w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 shadow-[0_8px_24px_rgba(245,158,11,0.3)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all" title="Life Lab — turn reading into action">
+            <span class="text-xl">🧠</span>
+          </button>
+
+          <div id="life-lab-modal" class="fixed inset-0 z-[120] hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+            <div class="w-full max-w-[410px] max-h-[88vh] overflow-y-auto custom-scrollbar bg-[#0f172a] border border-slate-800 rounded-[28px] shadow-2xl p-5">
+              <div class="flex items-start justify-between gap-3 mb-4">
+                <div>
+                  <div class="text-[9px] uppercase tracking-[0.2em] font-extrabold text-amber-400">Knowledge → Action</div>
+                  <h2 class="text-xl font-bold text-white mt-1">🧠 Life Lab</h2>
+                  <p class="text-[11px] text-slate-400 mt-1">Don't just collect ideas. Run one small experiment.</p>
+                </div>
+                <button onclick="closeLifeLab()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 hover:text-white">✕</button>
+              </div>
+
+              <div class="bg-gradient-to-br from-[#1c2438] to-[#121a2d] border border-slate-800 rounded-2xl p-4 mb-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-[9px] uppercase tracking-wider font-extrabold text-indigo-300">This week's idea</span>
+                  <button onclick="cycleLifeLabIdea()" class="text-[9px] font-bold text-slate-400 hover:text-white">Change idea ↻</button>
+                </div>
+                <h3 id="life-lab-idea-title" class="text-base font-bold text-white mt-2"></h3>
+                <p id="life-lab-idea-text" class="text-[11px] leading-relaxed text-slate-300 mt-1.5"></p>
+                <div id="life-lab-idea-source" class="text-[9px] text-slate-500 mt-2"></div>
+              </div>
+
+              <div class="space-y-3">
+                <div>
+                  <label class="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">1. Make it tiny</label>
+                  <input id="life-lab-action" class="mt-1.5 w-full bg-[#131b2e] border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-400" placeholder="e.g. Read 2 pages after Fajr">
+                </div>
+                <div>
+                  <label class="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">2. Choose the trigger</label>
+                  <input id="life-lab-cue" class="mt-1.5 w-full bg-[#131b2e] border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-400" placeholder="e.g. After Fajr prayer">
+                </div>
+                <div>
+                  <label class="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">3. Why does this matter?</label>
+                  <input id="life-lab-why" class="mt-1.5 w-full bg-[#131b2e] border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-400" placeholder="e.g. Become a consistent learner">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 mt-4">
+                <button onclick="saveLifeLabExperiment()" class="py-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 text-xs font-extrabold hover:brightness-110">Add 7-Day Experiment</button>
+                <button onclick="completeLifeLabReflection()" class="py-3 rounded-xl bg-slate-800 text-slate-200 text-xs font-bold hover:bg-slate-700">Weekly Reflection</button>
+              </div>
+
+              <div class="mt-4 bg-[#131b2e] border border-slate-800 rounded-2xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">Your current experiment</span>
+                  <span id="life-lab-status" class="text-[9px] font-bold text-amber-400">None yet</span>
+                </div>
+                <div id="life-lab-current" class="text-xs text-slate-300 leading-relaxed">Pick one idea and turn it into a behaviour you can actually test.</div>
+              </div>
+
+              <div id="life-lab-reflection" class="hidden mt-3">
+                <label class="text-[9px] uppercase tracking-wider font-extrabold text-slate-400">What changed this week?</label>
+                <textarea id="life-lab-reflection-input" rows="4" class="mt-1.5 w-full bg-[#131b2e] border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-400" placeholder="What worked? What failed? What will you keep?"></textarea>
+                <button onclick="saveLifeLabReflection()" class="w-full mt-2 py-2.5 rounded-xl bg-indigo-500 text-white text-xs font-bold">Save Reflection</button>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-slate-800 text-[9px] text-slate-500 leading-relaxed">
+                <b class="text-slate-400">The rule:</b> one idea → one tiny behaviour → one trigger → seven days → reflection. No collecting 27 new habits because a book got exciting. 😄
+              </div>
+            </div>
+          </div>
+
+          <script>
+          (() => {
+            const LIFE_LAB_ID = 'life-lab-experiment-v1';
+            const ideas = [
+              {title:'Identity before intensity', text:'Choose a behaviour that proves the person you want to become. Start so small that success feels almost boring.', source:'Inspired by identity-based habit design'},
+              {title:'Make the first step tiny', text:'Reduce the habit to the smallest useful action. Your goal is to make starting easy, especially on low-motivation days.', source:'Inspired by the 2-minute rule / Tiny Habits'},
+              {title:'Attach it to a trigger', text:'Use an existing routine as the cue: after Fajr, after opening your laptop, after dinner, etc. Pre-deciding the cue removes a lot of daily negotiation.', source:'Implementation-intention research'},
+              {title:'Design the environment', text:'Make good actions obvious and bad actions inconvenient. Put the book where you will see it; put distracting apps out of reach.', source:'Inspired by environment design'},
+              {title:'Run experiments, not promises', text:'Instead of saying “I will do this forever,” test one behaviour for seven days. Keep, modify, or drop it based on what actually happened.', source:'Behaviour-change / reflective practice'}
+            ];
+            let ideaIndex = 0;
+
+            function getLifeLabState() {
+              if (!AppState.lifeLab) AppState.lifeLab = {ideaIndex:0, experiment:null, reflection:''};
+              return AppState.lifeLab;
+            }
+
+            function renderLifeLab() {
+              const s = getLifeLabState();
+              ideaIndex = Number.isInteger(s.ideaIndex) ? s.ideaIndex : 0;
+              const idea = ideas[ideaIndex % ideas.length];
+              document.getElementById('life-lab-idea-title').innerText = idea.title;
+              document.getElementById('life-lab-idea-text').innerText = idea.text;
+              document.getElementById('life-lab-idea-source').innerText = idea.source;
+              const e = s.experiment;
+              document.getElementById('life-lab-status').innerText = e ? '7-Day Test' : 'None yet';
+              document.getElementById('life-lab-current').innerText = e ? `${e.action} • Trigger: ${e.cue} • Why: ${e.why}` : 'Pick one idea and turn it into a behaviour you can actually test.';
+            }
+
+            window.openLifeLab = function() {
+              const modal = document.getElementById('life-lab-modal');
+              modal.classList.remove('hidden');
+              modal.classList.add('flex');
+              renderLifeLab();
+            };
+            window.closeLifeLab = function() {
+              const modal = document.getElementById('life-lab-modal');
+              modal.classList.add('hidden');
+              modal.classList.remove('flex');
+            };
+            window.cycleLifeLabIdea = function() {
+              const s = getLifeLabState();
+              s.ideaIndex = (Number(s.ideaIndex || 0) + 1) % ideas.length;
+              ideaIndex = s.ideaIndex;
+              saveAppState();
+              renderLifeLab();
+            };
+            window.saveLifeLabExperiment = function() {
+              const action = document.getElementById('life-lab-action').value.trim();
+              const cue = document.getElementById('life-lab-cue').value.trim();
+              const why = document.getElementById('life-lab-why').value.trim();
+              if (!action || !cue) {
+                alert('Give your experiment a tiny action and a clear trigger first.');
+                return;
+              }
+              const s = getLifeLabState();
+              s.experiment = {action, cue, why: why || 'Build a better life through small actions', started: getFormattedDateStr(new Date()), idea: ideas[ideaIndex].title};
+              const existing = (AppState.habits || []).find(h => h.id === LIFE_LAB_ID);
+              const habit = {
+                id: LIFE_LAB_ID,
+                name: `🧪 ${action}`,
+                priority: 'Medium',
+                frequency: 'Daily',
+                location: 'Anywhere',
+                reminderTime: '08:00',
+                source: 'Life Lab',
+                cue,
+                tinyVersion: action,
+                why: why || 'Build a better life through small actions'
+              };
+              if (existing) {
+                Object.assign(existing, habit);
+              } else {
+                AppState.habits = AppState.habits || [];
+                AppState.habits.push(habit);
+              }
+              saveAppState();
+              renderLifeLab();
+              if (typeof switchTab === 'function') switchTab('today');
+              alert('7-day experiment added to your Daily Habits. Focus on starting, not perfection. 🌱');
+            };
+            window.completeLifeLabReflection = function() {
+              document.getElementById('life-lab-reflection').classList.remove('hidden');
+              const s = getLifeLabState();
+              document.getElementById('life-lab-reflection-input').value = s.reflection || '';
+            };
+            window.saveLifeLabReflection = function() {
+              const value = document.getElementById('life-lab-reflection-input').value.trim();
+              const s = getLifeLabState();
+              s.reflection = value;
+              s.lastReflection = getFormattedDateStr(new Date());
+              saveAppState();
+              document.getElementById('life-lab-reflection').classList.add('hidden');
+              alert('Reflection saved. Next week, keep / modify / drop — no guilt. 🌱');
+            };
+
+            window.addEventListener('keydown', (e) => {
+              if (e.key === 'Escape') window.closeLifeLab();
+            });
+          })();
+          </script>
+          <!-- /LIFE-LAB-V1 -->
+          '''
+
+          text = text.replace('</body>', block + '\n</body>', 1)
+          p.write_text(text, encoding='utf-8')
+          print('Life Lab installed.')
+          PY
+
+          rm -f .github/workflows/add-life-lab.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html .github/workflows/add-life-lab.yml
+          git diff --cached --quiet || git commit -m 'Add Life Lab knowledge-to-action coach'
+          git push
